@@ -9,25 +9,29 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
+           updatePassword, EmailAuthProvider, reauthenticateWithCredential,
+           updateEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-  // Expose to global scope
-  window._firebaseReady = false;
-  window._db = null;
+  // ── Hardcoded Firebase config — no setup screen needed ──
+  const firebaseConfig = {
+    apiKey:            "AIzaSyBLvsjAwAcV0zlTkFiIR4B19H-p_7jGSn4",
+    authDomain:        "vasant-lawns-9933a.firebaseapp.com",
+    projectId:         "vasant-lawns-9933a",
+    storageBucket:     "vasant-lawns-9933a.firebasestorage.app",
+    messagingSenderId: "577100249117",
+    appId:             "1:577100249117:web:2d0a933420320dff826ef4"
+  };
+
+  const app        = initializeApp(firebaseConfig);
+  window._db       = getFirestore(app);
+  window._auth     = getAuth(app);
+  window._firebaseReady = true;
   window._firebase = { collection, doc, setDoc, deleteDoc, onSnapshot, getDoc, getDocs };
+  window._fbAuth   = { signInWithEmailAndPassword, signOut, onAuthStateChanged,
+                       updatePassword, EmailAuthProvider, reauthenticateWithCredential, updateEmail };
 
-  function tryInitFirebase(){
-    const cfg = JSON.parse(localStorage.getItem('vl_fb_config') || 'null');
-    if(!cfg || !cfg.apiKey) return;
-    try {
-      const app = initializeApp(cfg, cfg.projectId);
-      window._db = getFirestore(app);
-      window._firebaseReady = true;
-      window.dispatchEvent(new Event('firebaseReady'));
-    } catch(e){ console.warn('Firebase init failed:', e); }
-  }
-
-  window.tryInitFirebase = tryInitFirebase;
-  tryInitFirebase();
+  window.dispatchEvent(new Event('firebaseReady'));
 </script>
 <style>
   :root {
@@ -177,8 +181,11 @@
     border-radius: 20px; font-size: 11px; font-weight: 600;
     text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px;
   }
-  .badge-owner { background: rgba(201,151,58,0.25); color: var(--gold-light); }
-  .badge-employee { background: rgba(74,138,66,0.25); color: #8FD987; }
+  .badge-owner    { background: rgba(201,151,58,0.25); color: var(--gold-light); }
+  .badge-manager  { background: rgba(40,100,180,0.25); color: #7EB8F7; }
+  .badge-employee { background: rgba(74,138,66,0.25);  color: #8FD987; }
+  /* Role-gated elements start hidden; JS shows them based on role */
+  .write-only, .owner-only, .no-employee, .amt-only { display: none; }
   .sidebar-user p { font-size: 14px; color: rgba(255,255,255,0.85); font-weight: 500; }
 
   nav { flex: 1; padding: 16px 0; overflow-y: auto; }
@@ -548,29 +555,7 @@
   .wa-log-item.sent b { color: var(--green); }
   .wa-log-item.failed b { color: var(--red); }
 
-  /* ── FIREBASE SETUP ── */
-  #fb-setup-page {
-    min-height: 100vh; display: none;
-    align-items: flex-start; justify-content: center;
-    background: linear-gradient(135deg, #1A1208 0%, #3D2B10 100%);
-    position: relative; overflow-y: auto;
-    padding: 24px 16px;
-  }
-  #fb-setup-page.show { display: flex; }
-  .fb-card {
-    background: var(--white); border-radius: 20px; padding: 32px 28px;
-    width: 560px; max-width: 100%;
-    box-shadow: 0 20px 80px rgba(0,0,0,0.4);
-    border-top: 4px solid #FF6B00;
-    margin: auto;
-  }
-  @media(max-width:600px){
-    .fb-card { padding: 24px 18px; border-radius: 14px; }
-    #fb-setup-page { padding: 16px 12px; }
-  }
-  .fb-step { display:flex; align-items:flex-start; gap:14px; margin-bottom:16px; padding:14px; background:var(--gold-pale); border-radius:10px; font-size:13px; line-height:1.6; }
-  .fb-step-num { background:var(--gold); color:var(--deep); font-weight:800; font-size:12px; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
-  .fb-step a { color:var(--gold); font-weight:600; }
+
   .sync-dot { width:8px; height:8px; border-radius:50%; background:#25D366; display:inline-block; margin-right:6px; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
   #loading-overlay {
@@ -587,64 +572,27 @@
 <!-- ════════════════ LOADING OVERLAY ════════════════ -->
 <div id="loading-overlay" style="display:none;">
   <div class="spinner"></div>
-  <span id="loading-text">Connecting to database...</span>
-</div>
-
-<!-- ════════════════ FIREBASE SETUP PAGE ════════════════ -->
-<div id="fb-setup-page">
-  <div class="fb-card">
-    <div style="text-align:center;margin-bottom:24px;">
-      <div style="font-size:40px;margin-bottom:8px;">🔥</div>
-      <h2 style="font-family:'Playfair Display',serif;font-size:22px;color:var(--deep);">Connect to Firebase</h2>
-      <p style="font-size:13px;color:var(--muted);margin-top:4px;">One-time setup to sync data across all devices</p>
-    </div>
-
-    <div class="fb-step">
-      <div class="fb-step-num">1</div>
-      <div>Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> → Create a project (e.g. <b>vasant-lawns</b>) → Disable Google Analytics → Create</div>
-    </div>
-    <div class="fb-step">
-      <div class="fb-step-num">2</div>
-      <div>In your project → <b>Build → Firestore Database</b> → Create database → choose <b>Start in test mode</b> → Next → Enable</div>
-    </div>
-    <div class="fb-step">
-      <div class="fb-step-num">3</div>
-      <div>Go to <b>Project Settings</b> (gear icon) → <b>Your apps</b> → click <b>&lt;/&gt; Web</b> → Register app → Copy the <b>firebaseConfig</b> values below</div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0;">
-      <div class="field"><label>API Key</label><input type="text" id="fb-apiKey" placeholder="AIzaSy..."></div>
-      <div class="field"><label>Auth Domain</label><input type="text" id="fb-authDomain" placeholder="project.firebaseapp.com"></div>
-      <div class="field"><label>Project ID</label><input type="text" id="fb-projectId" placeholder="vasant-lawns-xxxxx"></div>
-      <div class="field"><label>Storage Bucket</label><input type="text" id="fb-storageBucket" placeholder="project.appspot.com"></div>
-      <div class="field"><label>Messaging Sender ID</label><input type="text" id="fb-messagingSenderId" placeholder="123456789"></div>
-      <div class="field"><label>App ID</label><input type="text" id="fb-appId" placeholder="1:123:web:abc..."></div>
-    </div>
-
-    <button onclick="saveFbConfig()" class="btn-login" style="margin-top:0;">🔥 Connect & Save</button>
-    <p id="fb-error" style="color:var(--red);font-size:13px;margin-top:10px;text-align:center;display:none;"></p>
-    <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:14px;">Your config is saved in this browser. Share the HTML file with the config filled in for others.</p>
-  </div>
+  <span id="loading-text"><span data-t="connecting">Connecting to database...</span></span>
 </div>
 
 <!-- ════════════════ LOGIN PAGE ════════════════ -->
-<div id="login-page" style="display:none;">
+<div id="login-page" style="display:flex;">
   <div class="login-card">
     <div class="login-logo">
       <div class="emblem">🌿</div>
       <h1>Vasant Lawns</h1>
-      <p>Booking Management System</p>
+      <p><span data-t="bms_title">Booking Management System</span></p>
     </div>
     <div class="form-group">
-      <label>Username</label>
+      <label><span data-t="username">Username</span></label>
       <input type="text" id="login-user" placeholder="Enter username" autocomplete="off">
     </div>
     <div class="form-group">
-      <label>Password</label>
+      <label><span data-t="password_label">Password</span></label>
       <input type="password" id="login-pass" placeholder="Enter password">
     </div>
-    <button class="btn-login" onclick="doLogin()">Sign In →</button>
-    <p class="login-error" id="login-error">Invalid credentials. Please try again.</p>
+    <button class="btn-login" onclick="doLogin()"><span data-t="sign_in">Sign In →</span></button>
+    <p class="login-error" id="login-error"><span data-t="invalid_creds">Invalid credentials. Please try again.</span></p>
     <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:18px;"><span data-t="accessible">🌐 Vasant Lawns · Accessible from any device</span></p>
   </div>
 </div>
@@ -656,9 +604,9 @@
 
   <!-- Bottom nav more-menu -->
   <div class="bnav-more-menu" id="bnav-more-menu">
-    <button class="bnav-more-item" onclick="showSection('payments');closeMore()"><span>💰</span> <span data-t="payments"></span></button>
+    <button class="bnav-more-item no-employee" onclick="showSection('payments');closeMore()"><span>💰</span> <span data-t="payments"></span></button>
     <button class="bnav-more-item owner-only" onclick="showSection('reports');closeMore()"><span>📈</span> <span data-t="reports"></span></button>
-    <button class="bnav-more-item" onclick="showSection('whatsapp');closeMore()"><span>💬</span> <span data-t="whatsapp_nav"></span></button>
+    <button class="bnav-more-item write-only" onclick="showSection('whatsapp');closeMore()"><span>💬</span> <span data-t="whatsapp_nav"></span></button>
     <button class="bnav-more-item" onclick="showSection('account');closeMore()"><span>🔐</span> <span data-t="change_password"></span></button>
     <button class="bnav-more-item" onclick="doLogout()"><span>⬅</span> <span data-t="logout"></span></button>
   </div>
@@ -674,36 +622,36 @@
       </div>
     </div>
     <div class="sidebar-user">
-      <span class="user-badge" id="role-badge">Owner</span>
+      <span class="user-badge" id="role-badge"></span>
       <p id="user-name-display">Gorakh Vasant Kute Patil</p>
     </div>
     <nav>
-      <div class="nav-section">Main</div>
+      <div class="nav-section"><span data-t="nav_main">Main</span></div>
       <div class="nav-item active" onclick="showSection('dashboard')">
         <span class="icon">📊</span> <span data-t="dashboard">Dashboard</span>
       </div>
       <div class="nav-item" onclick="showSection('bookings')">
         <span class="icon">📋</span> <span data-t="all_bookings">All Bookings</span>
       </div>
-      <div class="nav-item" onclick="showSection('new-booking')">
+      <div class="nav-item write-only" onclick="showSection('new-booking')">
         <span class="icon">➕</span> <span data-t="new_booking">New Booking</span>
       </div>
-      <div class="nav-section">Finance</div>
-      <div class="nav-item" onclick="showSection('payments')">
+      <div class="nav-section"><span data-t="nav_finance">Finance</span></div>
+      <div class="nav-item no-employee" onclick="showSection('payments')">
         <span class="icon">💰</span> <span data-t="payments">Payments</span>
       </div>
-      <div class="nav-section">Calendar</div>
+      <div class="nav-section" data-t="calendar_nav_section">Calendar</div>
       <div class="nav-item" onclick="showSection('calendar')">
         <span class="icon">📅</span> <span data-t="calendar_nav">Availability</span>
       </div>
       <div class="nav-item owner-only" onclick="showSection('reports')">
         <span class="icon">📈</span> <span data-t="reports">Reports</span>
       </div>
-      <div class="nav-section">Messaging</div>
-      <div class="nav-item" onclick="showSection('whatsapp')">
+      <div class="nav-section"><span data-t="nav_messaging">Messaging</span></div>
+      <div class="nav-item write-only" onclick="showSection('whatsapp')">
         <span class="icon">💬</span> <span data-t="whatsapp_nav">WhatsApp</span>
       </div>
-      <div class="nav-section">Account</div>
+      <div class="nav-section"><span data-t="nav_account">Account</span></div>
       <div class="nav-item" onclick="showSection('account')">
         <span class="icon">🔐</span> <span data-t="change_password">Change Password</span>
       </div>
@@ -726,7 +674,7 @@
           <button class="lang-btn active" id="lang-en" onclick="setLang('en')">EN</button>
           <button class="lang-btn" id="lang-mr" onclick="setLang('mr')">मर</button>
         </div>
-        <span class="cloud-badge" style="font-size:11px;background:#e8f5e9;color:#2D5A27;padding:4px 10px;border-radius:20px;font-weight:600;">🌐 Cloud Ready</span>
+        <span class="cloud-badge" style="font-size:11px;background:#e8f5e9;color:#2D5A27;padding:4px 10px;border-radius:20px;font-weight:600;"><span data-t="cloud_ready">🌐 Cloud Ready</span></span>
         <span class="topbar-date" id="topbar-date"></span>
       </div>
     </div>
@@ -739,43 +687,43 @@
           <div class="stat-card gold">
             <div class="stat-icon">📋</div>
             <div class="stat-value" id="stat-total">0</div>
-            <div class="stat-label">Total Bookings</div>
+            <div class="stat-label"><span data-t="total_bookings">Total Bookings</span></div>
           </div>
           <div class="stat-card green">
             <div class="stat-icon">✅</div>
             <div class="stat-value" id="stat-confirmed">0</div>
-            <div class="stat-label">Confirmed</div>
+            <div class="stat-label"><span data-t="confirmed">Confirmed</span></div>
           </div>
-          <div class="stat-card blue">
+          <div class="stat-card blue amt-only">
             <div class="stat-icon">💵</div>
             <div class="stat-value" id="stat-collected">₹0</div>
-            <div class="stat-label">Amount Collected</div>
+            <div class="stat-label"><span data-t="amount_collected">Amount Collected</span></div>
           </div>
-          <div class="stat-card red">
+          <div class="stat-card red amt-only">
             <div class="stat-icon">⏳</div>
             <div class="stat-value" id="stat-due">₹0</div>
-            <div class="stat-label">Amount Due</div>
+            <div class="stat-label"><span data-t="amount_due">Amount Due</span></div>
           </div>
         </div>
 
         <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;">
           <div class="card">
-            <div class="card-header"><h4>Recent Bookings</h4></div>
+            <div class="card-header"><h4><span data-t="recent_bookings">Recent Bookings</span></h4></div>
             <div class="table-wrap">
               <table>
                 <thead>
-                  <tr><th>Client</th><th>Event Date</th><th>Event</th><th>Status</th><th>Due</th></tr>
+                  <tr><th><span data-t="client_h">Client</span></th><th><span data-t="event_date">Event Date</span></th><th><span data-t="event_h">Event</span></th><th><span data-t="status">Status</span></th><th><span data-t="due_h">Due</span></th></tr>
                 </thead>
                 <tbody id="recent-bookings-body">
-                  <tr><td colspan="5" class="no-data">No bookings yet</td></tr>
+                  <tr><td colspan="5" class="no-data"><span data-t="no_bookings_yet">No bookings yet</span></td></tr>
                 </tbody>
               </table>
             </div>
           </div>
           <div class="card">
-            <div class="card-header"><h4>Upcoming Events</h4></div>
+            <div class="card-header"><h4><span data-t="upcoming_events">Upcoming Events</span></h4></div>
             <div style="padding:16px;" id="upcoming-list">
-              <p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">No upcoming events</p>
+              <p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;"><span data-t="no_upcoming">No upcoming events</span></p>
             </div>
           </div>
         </div>
@@ -792,18 +740,19 @@
             <option>Completed</option>
             <option>Cancelled</option>
           </select>
-          <button class="btn btn-primary" onclick="showSection('new-booking')">➕ New Booking</button>
+          <button class="btn btn-primary write-only" onclick="showSection('new-booking')"><span data-t="new_booking_btn">➕ New Booking</span></button>
         </div>
         <div class="card">
-          <div class="card-header"><h4>All Bookings</h4><span id="booking-count" style="font-size:13px;color:var(--muted);">0 bookings</span></div>
+          <div class="card-header"><h4><span data-t="all_bookings">All Bookings</span></h4><span id="booking-count" style="font-size:13px;color:var(--muted);">0 bookings</span></div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>#ID</th><th>Client Name</th><th>Phone</th>
-                  <th>Booking Date</th><th>Event Date</th><th>Event Type</th>
-                  <th>Total (₹)</th><th>Paid (₹)</th><th>Due (₹)</th>
-                  <th>Status</th><th>Actions</th>
+                  <th>#ID</th><th><span data-t="client_name">Client Name</span></th><th><span data-t="phone">Phone</span></th>
+                  <th><span data-t="booking_date">Booking Date</span></th><th><span data-t="event_date">Event Date</span></th><th><span data-t="event_type">Event Type</span></th>
+                  <th class="amt-only"><span data-t="total_rs">Total (₹)</span></th><th class="amt-only"><span data-t="paid_rs">Paid (₹)</span></th><th class="amt-only"><span data-t="due_rs">Due (₹)</span></th>
+                  <th><span data-t="status">Status</span></th><th><span data-t="entry_by">Entry by</span></th>
+                  <th><span data-t="actions">Actions</span></th>
                 </tr>
               </thead>
               <tbody id="bookings-table-body"></tbody>
@@ -815,53 +764,42 @@
       <!-- ── NEW BOOKING ── -->
       <div class="section" id="section-new-booking">
         <div class="card" style="max-width:700px;">
-          <div class="card-header"><h4 id="booking-form-title">New Booking</h4></div>
+          <div class="card-header"><h4 id="booking-form-title"><span data-t="new_booking">New Booking</span></h4></div>
           <div class="modal-body">
             <input type="hidden" id="edit-booking-id">
             <div class="form-row">
               <div class="field">
-                <label>Client Name *</label>
+                <label><span data-t="full_name">Client Name *</span></label>
                 <input type="text" id="f-name" placeholder="Full name">
               </div>
               <div class="field">
-                <label>Phone Number *</label>
+                <label><span data-t="phone_label">Phone Number *</span></label>
                 <input type="text" id="f-phone" placeholder="+91 XXXXX XXXXX">
               </div>
             </div>
             <div class="form-row">
               <div class="field">
-                <label>Email</label>
+                <label><span data-t="email">Email</span></label>
                 <input type="email" id="f-email" placeholder="email@example.com">
               </div>
               <div class="field">
-                <label>Event Type *</label>
-                <select id="f-event">
-                  <option value="">Select event</option>
-                  <option>Wedding</option>
-                  <option>Reception</option>
-                  <option>Engagement</option>
-                  <option>Birthday Party</option>
-                  <option>Corporate Event</option>
-                  <option>Haldi / Mehendi</option>
-                  <option>Naming Ceremony</option>
-                  <option>Anniversary</option>
-                  <option>Other</option>
-                </select>
+                <label><span data-t="event_type_label">Event Type *</span></label>
+                <select id="f-event"></select>
               </div>
             </div>
             <div class="form-row">
               <div class="field">
-                <label>Booking Date *</label>
+                <label><span data-t="booking_date_label">Booking Date *</span></label>
                 <input type="date" id="f-booking-date">
               </div>
               <div class="field">
-                <label>Event Date *</label>
+                <label><span data-t="event_date_label">Event Date *</span></label>
                 <input type="date" id="f-event-date">
               </div>
             </div>
             <div class="form-row three">
               <div class="field">
-                <label>Slot</label>
+                <label><span data-t="slot">Slot</span></label>
                 <select id="f-slot">
                   <option>Morning (6am–2pm)</option>
                   <option>Evening (4pm–11pm)</option>
@@ -869,11 +807,11 @@
                 </select>
               </div>
               <div class="field">
-                <label>Expected Guests</label>
+                <label><span data-t="expected_guests">Expected Guests</span></label>
                 <input type="number" id="f-guests" placeholder="e.g. 500">
               </div>
               <div class="field">
-                <label>Status</label>
+                <label><span data-t="status">Status</span></label>
                 <select id="f-status">
                   <option>Confirmed</option>
                   <option>Pending</option>
@@ -884,27 +822,27 @@
             </div>
             <div class="form-row three">
               <div class="field">
-                <label>Total Amount (₹) *</label>
+                <label><span data-t="total_amount">Total Amount (₹) *</span></label>
                 <input type="number" id="f-total" placeholder="0" oninput="calcDue()">
               </div>
               <div class="field">
-                <label>Amount Paid (₹)</label>
+                <label><span data-t="amount_paid">Amount Paid (₹)</span></label>
                 <input type="number" id="f-paid" placeholder="0" oninput="calcDue()">
               </div>
               <div class="field">
-                <label>Amount Due (₹)</label>
+                <label><span data-t="amount_due_label">Amount Due (₹)</span></label>
                 <input type="number" id="f-due" placeholder="0" readonly style="background:#fff5f5;">
               </div>
             </div>
             <div class="form-row single">
               <div class="field">
-                <label>Notes / Special Requirements</label>
+                <label><span data-t="notes">Notes / Special Requirements</span></label>
                 <textarea id="f-notes" placeholder="Decoration preferences, catering notes, etc."></textarea>
               </div>
             </div>
             <div style="display:flex;gap:10px;margin-top:8px;">
-              <button class="btn btn-primary" onclick="saveBooking()">💾 Save Booking</button>
-              <button class="btn btn-outline" onclick="clearBookingForm()">✕ Clear</button>
+              <button class="btn btn-primary" onclick="saveBooking()"><span data-t="save_booking">💾 Save Booking</span></button>
+              <button class="btn btn-outline" onclick="clearBookingForm()"><span data-t="clear">✕ Clear</span></button>
             </div>
           </div>
         </div>
@@ -916,27 +854,27 @@
           <div class="stat-card green">
             <div class="stat-icon">💚</div>
             <div class="stat-value" id="pay-total-collected">₹0</div>
-            <div class="stat-label">Total Collected</div>
+            <div class="stat-label"><span data-t="total_collected">Total Collected</span></div>
           </div>
           <div class="stat-card red">
             <div class="stat-icon">🔴</div>
             <div class="stat-value" id="pay-total-due">₹0</div>
-            <div class="stat-label">Total Outstanding</div>
+            <div class="stat-label"><span data-t="total_outstanding">Total Outstanding</span></div>
           </div>
           <div class="stat-card gold">
             <div class="stat-icon">📊</div>
             <div class="stat-value" id="pay-total-bookings">₹0</div>
-            <div class="stat-label">Total Booking Value</div>
+            <div class="stat-label"><span data-t="total_booking_value">Total Booking Value</span></div>
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><h4>Payment Ledger</h4>
-            <button class="btn btn-sm btn-primary" onclick="openPayModal()">➕ Record Payment</button>
+          <div class="card-header"><h4><span data-t="payment_ledger">Payment Ledger</span></h4>
+            <button class="btn btn-sm btn-primary" onclick="openPayModal()"><span data-t="record_payment">➕ Record Payment</span></button>
           </div>
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>#ID</th><th>Client</th><th>Event Date</th><th>Total (₹)</th><th>Paid (₹)</th><th>Due (₹)</th><th>Status</th><th>Action</th></tr>
+                <tr><th>#ID</th><th><span data-t="client_h">Client</span></th><th><span data-t="event_date">Event Date</span></th><th><span data-t="total_rs">Total (₹)</span></th><th><span data-t="paid_rs">Paid (₹)</span></th><th><span data-t="due_rs">Due (₹)</span></th><th><span data-t="status">Status</span></th><th data-t="action_h">Action</th></tr>
               </thead>
               <tbody id="payments-body"></tbody>
             </table>
@@ -948,33 +886,33 @@
       <div class="section" id="section-calendar">
         <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;">
           <div class="card">
-            <div class="card-header"><h4>Booking Calendar</h4></div>
+            <div class="card-header"><h4><span data-t="availability_calendar">Booking Calendar</span></h4></div>
             <div style="padding:20px;">
               <div class="cal-nav">
-                <button onclick="calPrev()">‹ Prev</button>
-                <h4 id="cal-month-label">Month Year</h4>
-                <button onclick="calNext()">Next ›</button>
+                <button onclick="calPrev()"><span data-t="prev_btn">‹ Prev</span></button>
+                <h4 id="cal-month-label"><span data-t="month_year">Month Year</span></h4>
+                <button onclick="calNext()"><span data-t="next_btn">Next ›</span></button>
               </div>
               <div class="cal-grid">
-                <div class="cal-day-header">Sun</div>
-                <div class="cal-day-header">Mon</div>
-                <div class="cal-day-header">Tue</div>
-                <div class="cal-day-header">Wed</div>
-                <div class="cal-day-header">Thu</div>
-                <div class="cal-day-header">Fri</div>
-                <div class="cal-day-header">Sat</div>
+                <div class="cal-day-header"><span data-t="day_sun">Sun</span></div>
+                <div class="cal-day-header"><span data-t="day_mon">Mon</span></div>
+                <div class="cal-day-header"><span data-t="day_tue">Tue</span></div>
+                <div class="cal-day-header"><span data-t="day_wed">Wed</span></div>
+                <div class="cal-day-header"><span data-t="day_thu">Thu</span></div>
+                <div class="cal-day-header"><span data-t="day_fri">Fri</span></div>
+                <div class="cal-day-header"><span data-t="day_sat">Sat</span></div>
               </div>
               <div class="cal-grid" id="cal-days"></div>
               <div style="display:flex;gap:16px;margin-top:14px;font-size:12px;color:var(--muted);">
-                <span>⬛ Today</span>
-                <span style="color:var(--gold);">🟡 Booked</span>
+                <span><span data-t="legend_today">⬛ Today</span></span>
+                <span style="color:var(--gold);"><span data-t="legend_booked">🟡 Booked</span></span>
               </div>
             </div>
           </div>
           <div class="card">
-            <div class="card-header"><h4 id="cal-detail-title">Select a date</h4></div>
+            <div class="card-header"><h4 id="cal-detail-title"><span data-t="select_date">Select a date</span></h4></div>
             <div style="padding:16px;" id="cal-detail-body">
-              <p style="color:var(--muted);font-size:13px;">Click on a date to see bookings.</p>
+              <p style="color:var(--muted);font-size:13px;"><span data-t="click_date">Click on a date to see bookings.</span></p>
             </div>
           </div>
         </div>
@@ -983,17 +921,17 @@
       <!-- ── REPORTS (Owner only) ── -->
       <div class="section" id="section-reports">
         <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
-          <div class="stat-card gold"><div class="stat-icon">🏆</div><div class="stat-value" id="r-total-rev">₹0</div><div class="stat-label">Total Revenue</div></div>
-          <div class="stat-card green"><div class="stat-icon">📅</div><div class="stat-value" id="r-this-month">₹0</div><div class="stat-label">This Month</div></div>
-          <div class="stat-card blue"><div class="stat-icon">📦</div><div class="stat-value" id="r-bookings">0</div><div class="stat-label">Total Bookings</div></div>
+          <div class="stat-card gold"><div class="stat-icon">🏆</div><div class="stat-value" id="r-total-rev">₹0</div><div class="stat-label"><span data-t="total_revenue">Total Revenue</span></div></div>
+          <div class="stat-card green"><div class="stat-icon">📅</div><div class="stat-value" id="r-this-month">₹0</div><div class="stat-label"><span data-t="this_month">This Month</span></div></div>
+          <div class="stat-card blue"><div class="stat-icon">📦</div><div class="stat-value" id="r-bookings">0</div><div class="stat-label"><span data-t="total_bookings">Total Bookings</span></div></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;">
           <div class="card">
-            <div class="card-header"><h4>Event Type Breakdown</h4></div>
+            <div class="card-header"><h4><span data-t="event_breakdown">Event Type Breakdown</span></h4></div>
             <div style="padding:16px;" id="event-breakdown"></div>
           </div>
           <div class="card">
-            <div class="card-header"><h4>Monthly Summary</h4></div>
+            <div class="card-header"><h4><span data-t="monthly_summary">Monthly Summary</span></h4></div>
             <div style="padding:16px;" id="monthly-summary"></div>
           </div>
         </div>
@@ -1006,25 +944,25 @@
           <!-- LEFT: Send Message -->
           <div>
             <div class="wa-settings-section">
-              <h4>💬 Send WhatsApp Message</h4>
+              <h4><span data-t="send_whatsapp">💬 Send WhatsApp Message</span></h4>
               <div class="field" style="margin-bottom:14px;">
-                <label>Select Booking / Client</label>
+                <label><span data-t="select_booking_wa_label">Select Booking / Client</span></label>
                 <select id="wa-send-booking" onchange="fillWaContact()">
                   <option value="">-- Select a booking --</option>
                 </select>
               </div>
               <div class="form-row" style="margin-bottom:14px;">
                 <div class="field">
-                  <label>Phone Number</label>
+                  <label><span data-t="phone_num">Phone Number</span></label>
                   <input type="text" id="wa-send-phone" placeholder="+91 XXXXX XXXXX">
                 </div>
                 <div class="field">
-                  <label>Client Name</label>
+                  <label><span data-t="client_name">Client Name</span></label>
                   <input type="text" id="wa-send-name" placeholder="Auto-filled" readonly>
                 </div>
               </div>
               <div class="field" style="margin-bottom:12px;">
-                <label>Message Template</label>
+                <label><span data-t="message_template">Message Template</span></label>
                 <select id="wa-tpl-select" onchange="applyWaTemplate()">
                   <option value="">-- Choose template --</option>
                   <option value="confirm">✅ Booking Confirmation</option>
@@ -1036,7 +974,7 @@
                 </select>
               </div>
               <div class="field" style="margin-bottom:16px;">
-                <label>Message</label>
+                <label><span data-t="message_label">Message</span></label>
                 <textarea id="wa-message-body" rows="8" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;line-height:1.6;background:var(--cream);resize:vertical;outline:none;" placeholder="Select a template or type a custom message..."></textarea>
               </div>
               <button class="btn-wa" style="width:100%;justify-content:center;padding:13px;font-size:14px;" onclick="sendWaMessage()">
@@ -1049,18 +987,18 @@
           <!-- RIGHT: Templates + Log -->
           <div>
             <div class="wa-settings-section">
-              <h4>📋 Message Templates</h4>
-              <div class="wa-template-card" onclick="selectWaTpl('confirm')"><h5>✅ Booking Confirmation</h5><p>Sent when a new booking is confirmed. Includes date, venue &amp; booking ID.</p></div>
-              <div class="wa-template-card" onclick="selectWaTpl('reminder')"><h5>⏰ Payment Reminder</h5><p>Remind client of pending payment before the event date.</p></div>
-              <div class="wa-template-card" onclick="selectWaTpl('event_reminder')"><h5>📅 Event Day Reminder</h5><p>Warm reminder sent 1 day before the event.</p></div>
-              <div class="wa-template-card" onclick="selectWaTpl('payment_received')"><h5>💚 Payment Received</h5><p>Acknowledge payment receipt with updated balance.</p></div>
-              <div class="wa-template-card" onclick="selectWaTpl('cancelled')"><h5>❌ Booking Cancelled</h5><p>Inform client of cancellation with next steps.</p></div>
+              <h4><span data-t="message_templates">📋 Message Templates</span></h4>
+              <div class="wa-template-card" onclick="selectWaTpl('confirm')"><h5><span data-t="tpl_confirm">✅ Booking Confirmation</span></h5><p><span data-t="tpl_confirm_desc">Sent when a new booking is confirmed. Includes date, venue &amp; booking ID.</span></p></div>
+              <div class="wa-template-card" onclick="selectWaTpl('reminder')"><h5><span data-t="tpl_reminder">⏰ Payment Reminder</span></h5><p><span data-t="tpl_reminder_desc">Remind client of pending payment before the event date.</span></p></div>
+              <div class="wa-template-card" onclick="selectWaTpl('event_reminder')"><h5><span data-t="tpl_event">📅 Event Day Reminder</span></h5><p><span data-t="tpl_event_desc">Warm reminder sent 1 day before the event.</span></p></div>
+              <div class="wa-template-card" onclick="selectWaTpl('payment_received')"><h5><span data-t="tpl_payment_rcvd">💚 Payment Received</span></h5><p><span data-t="tpl_payment_desc">Acknowledge payment receipt with updated balance.</span></p></div>
+              <div class="wa-template-card" onclick="selectWaTpl('cancelled')"><h5><span data-t="tpl_cancelled">❌ Booking Cancelled</span></h5><p><span data-t="tpl_cancel_desc">Inform client of cancellation with next steps.</span></p></div>
             </div>
 
             <div class="wa-settings-section">
-              <h4>📜 Message Log</h4>
+              <h4><span data-t="message_log">📜 Message Log</span></h4>
               <div id="wa-log-list" style="max-height:280px;overflow-y:auto;">
-                <p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">No messages sent yet</p>
+                <p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;"><span data-t="no_messages">No messages sent yet</span></p>
               </div>
             </div>
           </div>
@@ -1070,28 +1008,54 @@
 
           <!-- ── ACCOUNT ── -->
       <div class="section" id="section-account">
-        <div style="max-width:500px;">
+        <div style="max-width:500px;display:flex;flex-direction:column;gap:20px;">
+
+          <!-- User info banner -->
+          <div style="background:var(--gold-pale);border:1px solid var(--border);border-radius:12px;padding:16px 18px;font-size:13px;color:var(--brown);display:flex;align-items:center;gap:14px;">
+            <div style="width:44px;height:44px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">👤</div>
+            <div>
+              <div style="font-weight:700;font-size:15px;" id="acc-username-display"></div>
+              <div style="margin-top:2px;" id="acc-role-display"></div>
+            </div>
+          </div>
+
+          <!-- Change Username -->
           <div class="card">
-            <div class="card-header"><h4>🔐 Change Password</h4></div>
+            <div class="card-header"><h4><span data-t="change_username_title">👤 Change Username</span></h4></div>
             <div class="modal-body">
-              <div style="background:var(--gold-pale);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:13px;color:var(--brown);">
-                <b>Logged in as:</b> <span id="acc-username-display"></span> &nbsp;·&nbsp; <span id="acc-role-display"></span>
-              </div>
               <div class="field" style="margin-bottom:14px;">
-                <label>Current Password</label>
+                <label><span data-t="current_username">Current Username</span></label>
+                <input type="text" id="acc-curr-user" placeholder="" readonly style="background:var(--gold-pale);color:var(--muted);">
+              </div>
+              <div class="field" style="margin-bottom:8px;">
+                <label><span data-t="new_username">New Username</span></label>
+                <input type="text" id="acc-new-user" placeholder="3–20 chars, letters & numbers" maxlength="20">
+              </div>
+              <p style="font-size:11px;color:var(--muted);margin-bottom:16px;"><span data-t="username_short">Min 3 chars, letters & numbers only.</span></p>
+              <button class="btn btn-primary" onclick="changeUsername()" style="width:100%;justify-content:center;padding:13px;"><span data-t="update_username">✅ Update Username</span></button>
+            </div>
+          </div>
+
+          <!-- Change Password -->
+          <div class="card">
+            <div class="card-header"><h4><span data-t="change_password_title">🔐 Change Password</span></h4></div>
+            <div class="modal-body">
+              <div class="field" style="margin-bottom:14px;">
+                <label><span data-t="current_password">Current Password</span></label>
                 <input type="password" id="acc-current-pass" placeholder="Enter current password">
               </div>
               <div class="field" style="margin-bottom:14px;">
-                <label>New Password</label>
+                <label><span data-t="new_password">New Password</span></label>
                 <input type="password" id="acc-new-pass" placeholder="Enter new password (min 6 chars)">
               </div>
               <div class="field" style="margin-bottom:20px;">
-                <label>Confirm New Password</label>
+                <label><span data-t="confirm_password">Confirm New Password</span></label>
                 <input type="password" id="acc-confirm-pass" placeholder="Re-enter new password">
               </div>
-              <button class="btn btn-primary" onclick="changePassword()" style="width:100%;justify-content:center;padding:13px;">🔒 Update Password</button>
+              <button class="btn btn-primary" onclick="changePassword()" style="width:100%;justify-content:center;padding:13px;"><span data-t="update_password">🔒 Update Password</span></button>
             </div>
           </div>
+
         </div>
       </div>
 
@@ -1106,7 +1070,7 @@
       <button class="bnav-item" onclick="showSection('bookings')">
         <span class="bicon">📋</span><span data-t="bookings"></span>
       </button>
-      <button class="bnav-item" onclick="showSection('new-booking')">
+      <button class="bnav-item write-only" onclick="showSection('new-booking')">
         <span class="bicon">➕</span><span data-t="new_booking_short"></span>
       </button>
       <button class="bnav-item" onclick="showSection('calendar')">
@@ -1123,14 +1087,14 @@
 <div class="modal-overlay" id="detail-modal">
   <div class="modal">
     <div class="modal-header">
-      <h3>Booking Details</h3>
+      <h3><span data-t="booking_details">Booking Details</span></h3>
       <button class="modal-close" onclick="closeModal('detail-modal')">✕</button>
     </div>
     <div class="modal-body" id="detail-modal-body"></div>
     <div class="modal-footer">
-      <button class="btn btn-outline btn-sm" onclick="closeModal('detail-modal')">Close</button>
-      <button class="btn-wa-outline" style="padding:6px 14px;font-size:12px;" onclick="waFromDetail()">💬 WhatsApp</button>
-      <button class="btn btn-primary btn-sm" onclick="editFromDetail()">✏️ Edit</button>
+      <button class="btn btn-outline btn-sm" onclick="closeModal('detail-modal')"><span data-t="close">Close</span></button>
+      <button class="btn-wa-outline" style="padding:6px 14px;font-size:12px;" onclick="waFromDetail()"><span data-t="whatsapp_btn">💬 WhatsApp</span></button>
+      <button class="btn btn-primary btn-sm" onclick="editFromDetail()"><span data-t="edit_btn">✏️ Edit</span></button>
     </div>
   </div>
 </div>
@@ -1139,12 +1103,12 @@
 <div class="modal-overlay" id="pay-modal">
   <div class="modal" style="width:460px;">
     <div class="modal-header">
-      <h3>Record Payment</h3>
+      <h3 data-t="record_payment_title">Record Payment</h3>
       <button class="modal-close" onclick="closeModal('pay-modal')">✕</button>
     </div>
     <div class="modal-body">
       <div class="field" style="margin-bottom:14px;">
-        <label>Select Booking</label>
+        <label><span data-t="select_booking_label">Select Booking</span></label>
         <select id="pay-booking-select" onchange="fillPayInfo()">
           <option value="">-- Select --</option>
         </select>
@@ -1152,11 +1116,11 @@
       <div id="pay-info-box" style="display:none;" class="pay-info"></div>
       <div class="form-row" style="margin-top:8px;">
         <div class="field">
-          <label>Amount to Add (₹)</label>
+          <label><span data-t="amount_to_add">Amount to Add (₹)</span></label>
           <input type="number" id="pay-amount" placeholder="0">
         </div>
         <div class="field">
-          <label>Payment Mode</label>
+          <label><span data-t="payment_mode">Payment Mode</span></label>
           <select id="pay-mode">
             <option>Cash</option>
             <option>Bank Transfer</option>
@@ -1166,30 +1130,38 @@
         </div>
       </div>
       <div class="field">
-        <label>Note</label>
+        <label><span data-t="note_label">Note</span></label>
         <input type="text" id="pay-note" placeholder="Optional note">
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline btn-sm" onclick="closeModal('pay-modal')">Cancel</button>
-      <button class="btn btn-success btn-sm" onclick="recordPayment()">✅ Confirm Payment</button>
+      <button class="btn btn-outline btn-sm" onclick="closeModal('pay-modal')"><span data-t="cancel_btn">Cancel</span></button>
+      <button class="btn btn-success btn-sm" onclick="recordPayment()"><span data-t="confirm_payment">✅ Confirm Payment</span></button>
     </div>
   </div>
 </div>
 
-<div id="toast">Saved!</div>
+<div id="toast"><span data-t="saved">Saved!</span></div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ══════════════════════════════════════════
-//  DATA & AUTH
+//  DATA & AUTH  (Firebase Authentication)
 // ══════════════════════════════════════════
-const USERS = {
-  gorakh:  { pass:'owner123', role:'owner',    name:'Gorakh Vasant Kute Patil' },
-  vasant:  { pass:'owner456', role:'owner',    name:'Vasant Kute Patil' },
-  rahul:   { pass:'emp123',   role:'employee', name:'Rahul Sharma' },
-  priya:   { pass:'emp456',   role:'employee', name:'Priya Desai' },
-  sunil:   { pass:'emp789',   role:'employee', name:'Sunil Patil' },
-};
+// Roles and names live in Firestore: users/{uid}
+// Passwords and email are managed by Firebase Auth — NOT stored here.
+
+let unsubscribeUsers = null;
+// ── ROLE HELPERS ──
+// owner   : full access (read, write, edit, delete, reports, amounts)
+// manager : read + write + edit (no delete, no reports) — sees amounts
+// employee: view only (no new booking, no edit, no delete, no amounts, no payments)
+function isOwner()    { return currentUser && currentUser.role === 'owner'; }
+function isManager()  { return currentUser && currentUser.role === 'manager'; }
+function isEmployee() { return currentUser && currentUser.role === 'employee'; }
+function canWrite()   { return isOwner() || isManager(); }   // create + edit
+function canDelete()  { return isOwner(); }                  // delete only
+function canSeeAmt()  { return isOwner() || isManager(); }   // financials
+function canSeeRep()  { return isOwner(); }                  // reports only owner
 
 let currentUser = null;
 let bookings = [];
@@ -1221,6 +1193,30 @@ async function saveCounter(){
   }
 }
 
+// Save a user profile record to Firestore (keyed by Firebase Auth UID)
+async function saveUserRecord(uid, data){
+  if(window._firebaseReady){
+    await window._firebase.setDoc(fbDoc('users', uid), data);
+  }
+}
+
+// Real-time profile sync — keeps display name fresh if admin updates Firestore
+function subscribeUsers(){
+  if(!window._firebaseReady || !currentUser) return;
+  if(unsubscribeUsers) unsubscribeUsers();
+  // Only listen to the current user's own document (by UID)
+  unsubscribeUsers = window._firebase.onSnapshot(fbDoc('users', currentUser.uid), snap=>{
+    if(snap.exists()){
+      const d = snap.data();
+      currentUser.name = d.name;
+      currentUser.role = d.role;
+      currentUser.username = d.username;
+      const nameEl = document.getElementById('user-name-display');
+      if(nameEl) nameEl.textContent = d.name;
+    }
+  });
+}
+
 async function getCounter(){
   if(window._firebaseReady){
     const snap = await window._firebase.getDoc(fbDoc('meta','counter'));
@@ -1250,57 +1246,95 @@ function subscribeBookings(){
 
 
 // ══════════════════════════════════════════
-//  LOGIN / LOGOUT
+//  LOGIN / LOGOUT  (Firebase Authentication)
 // ══════════════════════════════════════════
 async function doLogin(){
-  const u = document.getElementById('login-user').value.trim().toLowerCase();
-  const p = document.getElementById('login-pass').value;
+  const usernameInput = document.getElementById('login-user').value.trim().toLowerCase();
+  const password = document.getElementById('login-pass').value;
   const err = document.getElementById('login-error');
-  // Try loading password from Firestore first
-  if(window._firebaseReady && USERS[u]){
-    try {
-      const snap = await window._firebase.getDoc(window._firebase.doc(db(),'passwords',u));
-      if(snap.exists()) localStorage.setItem(getUserPassKey(u), snap.data().pass);
-    } catch(e){}
+  err.style.display = 'none';
+
+  if(!usernameInput || !password){ err.style.display='block'; return; }
+
+  if(!window._firebaseReady){
+    err.textContent = 'Database not connected. Please check your Firebase config.';
+    err.style.display='block'; return;
   }
-  if(USERS[u] && getUserPassword(u) === p){
-    currentUser = { ...USERS[u], username: u };
-    err.style.display='none';
-    document.getElementById('login-page').style.display='none';
-    document.getElementById('app').classList.add('visible');
-    initApp();
-  } else {
+
+  // Resolve username → email stored in Firestore users_map/{username}
+  let email = '';
+  try {
+    const mapSnap = await window._firebase.getDoc(fbDoc('users_map', usernameInput));
+    if(mapSnap.exists()){
+      email = mapSnap.data().email;
+    } else {
+      err.textContent = 'Invalid credentials. Please try again.';
+      err.style.display='block'; return;
+    }
+  } catch(e){
+    err.textContent = 'Invalid credentials. Please try again.';
+    err.style.display='block'; return;
+  }
+
+  try {
+    const cred = await window._fbAuth.signInWithEmailAndPassword(window._auth, email, password);
+    // onAuthStateChanged handles the rest
+  } catch(e){
+    err.textContent = 'Invalid credentials. Please try again.';
     err.style.display='block';
   }
 }
 document.addEventListener('keydown', e=>{ if(e.key==='Enter' && document.getElementById('login-page').style.display!=='none') doLogin(); });
 
-function doLogout(){
+async function doLogout(){
+  if(unsubscribeUsers){ unsubscribeUsers(); unsubscribeUsers=null; }
+  if(unsubscribeBookings){ unsubscribeBookings(); unsubscribeBookings=null; }
   currentUser=null;
   document.body.classList.remove('app-active');
-  document.getElementById('login-page').style.display='flex';
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-user').value='';
   document.getElementById('login-pass').value='';
+  if(window._auth) await window._fbAuth.signOut(window._auth);
+  document.getElementById('login-page').style.display='flex';
 }
 
 function initApp(){
   document.getElementById('user-name-display').textContent = currentUser.name;
+
+  // Badge
   const badge = document.getElementById('role-badge');
-  badge.textContent = currentUser.role==='owner'?'Owner':'Employee';
-  badge.className = 'user-badge ' + (currentUser.role==='owner'?'badge-owner':'badge-employee');
+  const roleLabel = { owner:'Owner', manager:'Manager', employee:'Employee' };
+  badge.textContent = roleLabel[currentUser.role] || currentUser.role;
+  badge.className = 'user-badge badge-' + currentUser.role;
+
+  // owner-only: Reports nav (flex when owner)
   document.querySelectorAll('.owner-only').forEach(el=>{
-    el.style.display = currentUser.role==='owner'?'flex':'none';
+    el.style.display = isOwner() ? 'flex' : 'none';
   });
+  // write-only: New Booking, WhatsApp (flex when owner or manager)
+  document.querySelectorAll('.write-only').forEach(el=>{
+    el.style.display = canWrite() ? 'flex' : 'none';
+  });
+  // no-employee: Payments (flex when owner or manager)
+  document.querySelectorAll('.no-employee').forEach(el=>{
+    el.style.display = isEmployee() ? 'none' : 'flex';
+  });
+  // amt-only: Amount stat cards, table amount columns
+  document.querySelectorAll('.amt-only').forEach(el=>{
+    if(canSeeAmt()){
+      el.style.display = (el.tagName==='TH' || el.tagName==='TD') ? 'table-cell' : 'block';
+    } else {
+      el.style.display = 'none';
+    }
+  });
+
   document.getElementById('topbar-date').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  // Subscribe to real-time updates
   document.body.classList.add('app-active');
-  // Set language buttons
-  document.getElementById('lang-en').classList.toggle('active', currentLang==='en');
-  document.getElementById('lang-mr').classList.toggle('active', currentLang==='mr');
+  subscribeUsers();
   subscribeBookings();
   showSection('dashboard');
-  setTimeout(applyLang, 50);
+  rebuildAllSelects();
+  setTimeout(applyLang, 80);
 }
 
 // ══════════════════════════════════════════
@@ -1314,170 +1348,282 @@ let currentLang = localStorage.getItem('vl_lang') || 'en';
 const LANG = {
   en: {
     // Nav
-    dashboard: 'Dashboard', bookings: 'Bookings', new_booking: 'New Booking',
-    new_booking_short: 'New', payments: 'Payments', calendar_short: 'Calendar',
-    calendar_nav: 'Availability', reports: 'Reports', whatsapp_nav: 'WhatsApp',
-    change_password: 'Change Password', logout: 'Logout', more: 'More',
-    // Topbar
-    cloud_ready: '🌐 Cloud Ready',
+    dashboard:'Dashboard', all_bookings:'All Bookings', new_booking:'New Booking',
+    new_booking_short:'New', payments:'Payments', calendar_short:'Calendar',
+    calendar_nav:'Availability', calendar_nav_section:'Calendar',
+    reports:'Reports', whatsapp_nav:'WhatsApp', change_password:'Change Password',
+    logout:'Logout', more:'More', nav_main:'Main', nav_finance:'Finance',
+    nav_messaging:'Messaging', nav_account:'Account',
+    // Header
+    bms_title:'Booking Management System', management_portal:'Management Portal',
+    cloud_ready:'🌐 Cloud Ready', accessible:'🌐 Vasant Lawns · Accessible from any device',
+    owner:'Owner', manager:'Manager', employee:'Employee',
+    // Login
+    username:'Username', password_label:'Password', sign_in:'Sign In →',
+    invalid_creds:'Invalid credentials. Please try again.',
     // Dashboard
-    total_bookings: 'Total Bookings', confirmed: 'Confirmed',
-    amount_collected: 'Amount Collected', amount_due: 'Amount Due',
-    recent_bookings: 'Recent Bookings', upcoming_events: 'Upcoming Events',
-    no_bookings_yet: 'No bookings yet', no_upcoming: 'No upcoming events',
+    total_bookings:'Total Bookings', confirmed:'Confirmed',
+    amount_collected:'Amount Collected', amount_due:'Amount Due',
+    recent_bookings:'Recent Bookings', upcoming_events:'Upcoming Events',
+    no_bookings_yet:'No bookings yet', no_upcoming:'No upcoming events',
     // Bookings table
-    all_bookings: 'All Bookings', search_placeholder: '🔍  Search by name, phone, event...',
-    all_status: 'All Status', client_name: 'Client Name', phone: 'Phone',
-    booking_date: 'Booking Date', event_date: 'Event Date', event_type: 'Event Type',
-    total: 'Total (₹)', paid: 'Paid (₹)', due: 'Due (₹)', status: 'Status', actions: 'Actions',
-    no_bookings_found: 'No bookings found',
+    client_name:'Client Name', phone:'Phone', booking_date:'Booking Date',
+    event_date:'Event Date', event_type:'Event Type',
+    total_rs:'Total (₹)', paid_rs:'Paid (₹)', due_rs:'Due (₹)',
+    status:'Status', actions:'Actions', action_h:'Action',
+    client_h:'Client', event_h:'Event', due_h:'Due',
+    no_bookings_found:'No bookings found',
+    new_booking_btn:'➕ New Booking',
+    bookings_count_suffix:' bookings',
     // New booking form
-    new_booking_title: 'New Booking', edit_booking_title: 'Edit Booking',
-    full_name: 'Client Name *', phone_label: 'Phone Number *', email: 'Email',
-    event_type_label: 'Event Type *', booking_date_label: 'Booking Date *',
-    event_date_label: 'Event Date *', slot: 'Slot', expected_guests: 'Expected Guests',
-    status_label: 'Status', total_amount: 'Total Amount (₹) *',
-    amount_paid: 'Amount Paid (₹)', amount_due_label: 'Amount Due (₹)',
-    notes: 'Notes / Special Requirements', save_booking: '💾 Save Booking', clear: '✕ Clear',
-    select_event: 'Select event',
-    morning: 'Morning (6am–2pm)', evening: 'Evening (4pm–11pm)', full_day: 'Full Day',
-    wedding: 'Wedding', reception: 'Reception', engagement: 'Engagement',
-    birthday: 'Birthday Party', corporate: 'Corporate Event', haldi: 'Haldi / Mehendi',
-    naming: 'Naming Ceremony', anniversary: 'Anniversary', other: 'Other',
+    new_booking_title:'New Booking', edit_booking_title:'Edit Booking',
+    full_name:'Client Name *', phone_label:'Phone Number *', phone_num:'Phone Number',
+    email:'Email', event_type_label:'Event Type *',
+    booking_date_label:'Booking Date *', event_date_label:'Event Date *',
+    slot:'Slot', expected_guests:'Expected Guests', status_label:'Status',
+    total_amount:'Total Amount (₹) *', amount_paid:'Amount Paid (₹)',
+    amount_due_label:'Amount Due (₹)', notes:'Notes / Special Requirements',
+    save_booking:'💾 Save Booking', clear:'✕ Clear',
+    // Select options
+    select_event:'Select event',
+    opt_wedding:'Wedding', opt_reception:'Reception', opt_engagement:'Engagement',
+    opt_birthday:'Birthday Party', opt_corporate:'Corporate Event',
+    opt_haldi:'Haldi / Mehendi', opt_naming:'Naming Ceremony',
+    opt_anniversary:'Anniversary', opt_other:'Other',
+    opt_morning:'Morning (6am–2pm)', opt_evening:'Evening (4pm–11pm)', opt_full_day:'Full Day',
+    opt_cash:'Cash', opt_bank:'Bank Transfer', opt_upi:'UPI', opt_cheque:'Cheque',
+    all_status:'All Status', s_confirmed:'Confirmed', s_pending:'Pending',
+    s_completed:'Completed', s_cancelled:'Cancelled',
     // Payments
-    total_collected: 'Total Collected', total_outstanding: 'Total Outstanding',
-    total_booking_value: 'Total Booking Value', payment_ledger: 'Payment Ledger',
-    record_payment: '➕ Record Payment', cleared: '✅ Cleared',
-    select_booking: '-- Select Booking --', amount_to_add: 'Amount to Add (₹)',
-    payment_mode: 'Payment Mode', note: 'Note', confirm_payment: '✅ Confirm Payment',
-    cash: 'Cash', bank_transfer: 'Bank Transfer', upi: 'UPI', cheque: 'Cheque',
+    total_collected:'Total Collected', total_outstanding:'Total Outstanding',
+    total_booking_value:'Total Booking Value',
+    payment_ledger:'Payment Ledger', record_payment:'➕ Record Payment',
+    record_payment_title:'Record Payment',
+    select_booking_label:'Select Booking', amount_to_add:'Amount to Add (₹)',
+    payment_mode:'Payment Mode', note_label:'Note',
+    confirm_payment:'✅ Confirm Payment', cancel_btn:'Cancel',
+    select_booking:'-- Select Booking --', cleared_lbl:'✅ Cleared',
+    pay_btn:'+ Pay',
     // Calendar
-    availability_calendar: 'Booking Calendar', select_date: 'Select a date',
-    available: '✅ Available – No bookings', view_details: 'View Details',
+    availability_calendar:'Booking Calendar', select_date:'Select a date',
+    click_date:'Click on a date to see bookings.',
+    legend_today:'⬛ Today', legend_booked:'🟡 Booked',
+    prev_btn:'‹ Prev', next_btn:'Next ›', month_year:'Month Year',
+    available:'✅ Available – No bookings', view_details:'View Details',
+    day_sun:'Sun', day_mon:'Mon', day_tue:'Tue', day_wed:'Wed',
+    day_thu:'Thu', day_fri:'Fri', day_sat:'Sat',
     // Reports
-    total_revenue: 'Total Revenue', this_month: 'This Month',
-    event_breakdown: 'Event Type Breakdown', monthly_summary: 'Monthly Summary',
+    total_revenue:'Total Revenue', this_month:'This Month',
+    event_breakdown:'Event Type Breakdown', monthly_summary:'Monthly Summary',
     // WhatsApp
-    send_whatsapp: '💬 Send WhatsApp Message', select_booking_wa: '-- Select a booking --',
-    message_template: 'Message Template', message_label: 'Message',
-    open_whatsapp: 'Open in WhatsApp', message_log: '📜 Message Log',
-    message_templates: '📋 Message Templates', no_messages: 'No messages sent yet',
-    choose_template: '-- Choose template --',
-    tpl_confirm: '✅ Booking Confirmation', tpl_reminder: '⏰ Payment Reminder',
-    tpl_event: '📅 Event Day Reminder', tpl_payment_rcvd: '💚 Payment Received',
-    tpl_cancelled: '❌ Booking Cancelled', tpl_custom: '✍️ Custom Message',
+    send_whatsapp:'💬 Send WhatsApp Message',
+    select_booking_wa_label:'Select Booking / Client',
+    select_booking_wa:'-- Select a booking --',
+    message_template:'Message Template', message_label:'Message',
+    open_whatsapp:'Open in WhatsApp', message_log:'📜 Message Log',
+    message_templates:'📋 Message Templates', no_messages:'No messages sent yet',
+    choose_template:'-- Choose template --',
+    tpl_confirm:'✅ Booking Confirmation', tpl_reminder:'⏰ Payment Reminder',
+    tpl_event:'📅 Event Day Reminder', tpl_payment_rcvd:'💚 Payment Received',
+    tpl_cancelled:'❌ Booking Cancelled', tpl_custom:'✍️ Custom Message',
+    tpl_confirm_desc:'Sent when a new booking is confirmed. Includes date, venue & booking ID.',
+    tpl_reminder_desc:'Remind client of pending payment before the event date.',
+    tpl_event_desc:'Warm reminder sent 1 day before the event.',
+    tpl_payment_desc:'Acknowledge payment receipt with updated balance.',
+    tpl_cancel_desc:'Inform client of cancellation with next steps.',
     // Account
-    account_settings: 'Account Settings', change_password_title: '🔐 Change Password',
-    logged_in_as: 'Logged in as:', current_password: 'Current Password',
-    new_password: 'New Password', confirm_password: 'Confirm New Password',
-    update_password: '🔒 Update Password',
-    // Status tags
-    s_confirmed: 'Confirmed', s_pending: 'Pending', s_completed: 'Completed', s_cancelled: 'Cancelled',
+    account_settings:'Account Settings', change_password_title:'🔐 Change Password',
+    logged_in_as:'Logged in as:', current_password:'Current Password',
+    new_password:'New Password', confirm_password:'Confirm New Password',
+    update_password:'🔒 Update Password',
     // Detail modal
-    booking_details: 'Booking Details', booking_id: 'Booking ID',
-    client_name_d: 'Client Name', slot_d: 'Slot', guests_d: 'Expected Guests',
-    total_amount_d: 'Total Amount', amount_paid_d: 'Amount Paid', amount_due_d: 'Amount Due',
-    notes_d: 'Notes', close: 'Close', edit: '✏️ Edit',
-    // Toast / alerts
-    fill_required: 'Please fill all required fields (*)',
-    booking_saved: 'Booking saved! ID: ', booking_updated: 'Booking updated!',
-    booking_deleted: 'Booking deleted.', payment_recorded: 'Payment recorded: ',
-    pass_incorrect: 'Current password is incorrect.',
-    pass_short: 'New password must be at least 6 characters.',
-    pass_mismatch: 'Passwords do not match.',
-    pass_updated: '✅ Password updated successfully!',
-    select_booking_err: 'Please select a booking', enter_amount: 'Enter a valid amount',
-    wa_opened: '💬 WhatsApp opened for ',
-    // Misc
-    owner: 'Owner', employee: 'Employee',
-    management_portal: 'Management Portal',
-    accessible: '<span data-t="accessible">🌐 Vasant Lawns · Accessible from any device</span>',
-    delete_confirm: 'Delete booking ', delete_confirm2: '? This cannot be undone.',
+    booking_details:'Booking Details', booking_id:'Booking ID',
+    client_name_d:'Client Name', slot_d:'Slot', guests_d:'Expected Guests',
+    total_amount_d:'Total Amount', amount_paid_d:'Amount Paid', amount_due_d:'Amount Due',
+    notes_d:'Notes', close:'Close', edit_btn:'✏️ Edit', whatsapp_btn:'💬 WhatsApp',
+    // Firebase
+    fb_connect_title:'Connect to Firebase',
+    fb_subtitle:'One-time setup to sync data across all devices',
+    fb_connect_btn:'🔥 Connect & Save', connecting:'Connecting to database...',
+    fb_hint:'Your config is saved in this browser. Share the HTML file with the config filled in for others.',
+    // Toast
+    saved:'Saved!',
+    fill_required:'Please fill all required fields (*)',
+    booking_saved:'Booking saved! ID: ', booking_updated:'Booking updated!',
+    booking_deleted:'Booking deleted.', payment_recorded:'Payment recorded: ',
+    pass_incorrect:'Current password is incorrect.',
+    pass_short:'New password must be at least 6 characters.',
+    pass_mismatch:'Passwords do not match.',
+    pass_updated:'✅ Password updated successfully!',
+    select_booking_err:'Please select a booking', enter_amount:'Enter a valid amount',
+    wa_opened:'💬 WhatsApp opened for ',
+    delete_confirm:'Delete booking ', delete_confirm2:'? This cannot be undone.',
+    // Placeholders
+    ph_name:'Full name', ph_phone:'+91 XXXXX XXXXX', ph_email:'email@example.com',
+    ph_guests:'e.g. 500', ph_notes:'Decoration preferences, catering notes, etc.',
+    ph_wa_msg:'Select a template or type a custom message...',
+    ph_curr_pass:'Enter current password',
+    ph_new_pass:'Enter new password (min 6 chars)',
+    ph_conf_pass:'Re-enter new password',
+    ph_pay_note:'Optional note',
+    ph_login_user:'Enter username', ph_login_pass:'Enter password',
+    ph_search:'🔍  Search by name, phone, event...',
+    // Account - new
+    change_username_title:'👤 Change Username',
+    current_username:'Current Username',
+    new_username:'New Username',
+    update_username:'✅ Update Username',
+    username_short:'Min 3 chars, letters & numbers only.',
+    username_taken:'Username already taken.',
+    username_updated:'✅ Username updated!',
+    username_invalid:'Username must be 3–20 chars, letters/numbers only.',
+    entry_by:'Entry by', last_edited_by:'Last edited by',
+    // Session
+    session_expired:'Session expired. Please log in again.',
+    no_permission:'You do not have permission for this action.',
+    stay_logged:'Keeping you logged in',
   },
   mr: {
     // Nav
-    dashboard: 'डॅशबोर्ड', bookings: 'बुकिंग्स', new_booking: 'नवीन बुकिंग',
-    new_booking_short: 'नवीन', payments: 'पेमेंट', calendar_short: 'कॅलेंडर',
-    calendar_nav: 'उपलब्धता', reports: 'अहवाल', whatsapp_nav: 'व्हॉटसॅप',
-    change_password: 'पासवर्ड बदला', logout: 'बाहेर पडा', more: 'अधिक',
-    // Topbar
-    cloud_ready: '🌐 क्लाउड तयार',
+    dashboard:'डॅशबोर्ड', all_bookings:'सर्व बुकिंग्स', new_booking:'नवीन बुकिंग',
+    new_booking_short:'नवीन', payments:'पेमेंट', calendar_short:'कॅलेंडर',
+    calendar_nav:'उपलब्धता', calendar_nav_section:'कॅलेंडर',
+    reports:'अहवाल', whatsapp_nav:'व्हॉटसॅप', change_password:'पासवर्ड बदला',
+    logout:'बाहेर पडा', more:'अधिक', nav_main:'मुख्य', nav_finance:'वित्त',
+    nav_messaging:'संदेशवहन', nav_account:'खाते',
+    // Header
+    bms_title:'बुकिंग व्यवस्थापन प्रणाली', management_portal:'व्यवस्थापन पोर्टल',
+    cloud_ready:'🌐 क्लाउड तयार', accessible:'🌐 वसंत लॉन्स · कोणत्याही डिव्हाइसवरून प्रवेश करा',
+    owner:'मालक', manager:'व्यवस्थापक', employee:'कर्मचारी',
+    // Login
+    username:'वापरकर्तानाव', password_label:'पासवर्ड', sign_in:'साइन इन करा →',
+    invalid_creds:'चुकीची माहिती. कृपया पुन्हा प्रयत्न करा.',
     // Dashboard
-    total_bookings: 'एकूण बुकिंग्स', confirmed: 'पुष्टी झालेल्या',
-    amount_collected: 'जमा रक्कम', amount_due: 'देय रक्कम',
-    recent_bookings: 'अलीकडील बुकिंग्स', upcoming_events: 'आगामी कार्यक्रम',
-    no_bookings_yet: 'अद्याप बुकिंग नाही', no_upcoming: 'कोणतेही आगामी कार्यक्रम नाही',
+    total_bookings:'एकूण बुकिंग्स', confirmed:'पुष्टी झालेल्या',
+    amount_collected:'जमा रक्कम', amount_due:'देय रक्कम',
+    recent_bookings:'अलीकडील बुकिंग्स', upcoming_events:'आगामी कार्यक्रम',
+    no_bookings_yet:'अद्याप बुकिंग नाही', no_upcoming:'कोणतेही आगामी कार्यक्रम नाही',
     // Bookings table
-    all_bookings: 'सर्व बुकिंग्स', search_placeholder: '🔍  नाव, फोन, कार्यक्रम शोधा...',
-    all_status: 'सर्व स्थिती', client_name: 'ग्राहकाचे नाव', phone: 'फोन',
-    booking_date: 'बुकिंग तारीख', event_date: 'कार्यक्रम तारीख', event_type: 'कार्यक्रम प्रकार',
-    total: 'एकूण (₹)', paid: 'भरलेले (₹)', due: 'देय (₹)', status: 'स्थिती', actions: 'कृती',
-    no_bookings_found: 'कोणतीही बुकिंग सापडली नाही',
+    client_name:'ग्राहकाचे नाव', phone:'फोन', booking_date:'बुकिंग तारीख',
+    event_date:'कार्यक्रम तारीख', event_type:'कार्यक्रम प्रकार',
+    total_rs:'एकूण (₹)', paid_rs:'भरलेले (₹)', due_rs:'देय (₹)',
+    status:'स्थिती', actions:'कृती', action_h:'कृती',
+    client_h:'ग्राहक', event_h:'कार्यक्रम', due_h:'देय',
+    no_bookings_found:'कोणतीही बुकिंग सापडली नाही',
+    new_booking_btn:'➕ नवीन बुकिंग',
+    bookings_count_suffix:' बुकिंग्स',
     // New booking form
-    new_booking_title: 'नवीन बुकिंग', edit_booking_title: 'बुकिंग संपादित करा',
-    full_name: 'ग्राहकाचे नाव *', phone_label: 'फोन नंबर *', email: 'ईमेल',
-    event_type_label: 'कार्यक्रम प्रकार *', booking_date_label: 'बुकिंग तारीख *',
-    event_date_label: 'कार्यक्रम तारीख *', slot: 'वेळ', expected_guests: 'अपेक्षित पाहुणे',
-    status_label: 'स्थिती', total_amount: 'एकूण रक्कम (₹) *',
-    amount_paid: 'भरलेली रक्कम (₹)', amount_due_label: 'देय रक्कम (₹)',
-    notes: 'नोट्स / विशेष आवश्यकता', save_booking: '💾 बुकिंग जतन करा', clear: '✕ साफ करा',
-    select_event: 'कार्यक्रम निवडा',
-    morning: 'सकाळ (सकाळी ६–दुपारी २)', evening: 'संध्याकाळ (सायं ४–रात्री ११)', full_day: 'संपूर्ण दिवस',
-    wedding: 'विवाह सोहळा', reception: 'रिसेप्शन', engagement: 'साखरपुडा',
-    birthday: 'वाढदिवस पार्टी', corporate: 'कॉर्पोरेट कार्यक्रम', haldi: 'हळदी / मेहंदी',
-    naming: 'बारसे', anniversary: 'वर्धापन दिन', other: 'इतर',
+    new_booking_title:'नवीन बुकिंग', edit_booking_title:'बुकिंग संपादित करा',
+    full_name:'ग्राहकाचे नाव *', phone_label:'फोन नंबर *', phone_num:'फोन नंबर',
+    email:'ईमेल', event_type_label:'कार्यक्रम प्रकार *',
+    booking_date_label:'बुकिंग तारीख *', event_date_label:'कार्यक्रम तारीख *',
+    slot:'वेळ', expected_guests:'अपेक्षित पाहुणे', status_label:'स्थिती',
+    total_amount:'एकूण रक्कम (₹) *', amount_paid:'भरलेली रक्कम (₹)',
+    amount_due_label:'देय रक्कम (₹)', notes:'नोट्स / विशेष आवश्यकता',
+    save_booking:'💾 बुकिंग जतन करा', clear:'✕ साफ करा',
+    // Select options
+    select_event:'कार्यक्रम निवडा',
+    opt_wedding:'विवाह सोहळा', opt_reception:'रिसेप्शन', opt_engagement:'साखरपुडा',
+    opt_birthday:'वाढदिवस पार्टी', opt_corporate:'कॉर्पोरेट कार्यक्रम',
+    opt_haldi:'हळदी / मेहंदी', opt_naming:'बारसे',
+    opt_anniversary:'वर्धापन दिन', opt_other:'इतर',
+    opt_morning:'सकाळ (सकाळी ६–दुपारी २)', opt_evening:'संध्याकाळ (सायं ४–रात्री ११)',
+    opt_full_day:'संपूर्ण दिवस',
+    opt_cash:'रोख', opt_bank:'बँक ट्रान्सफर', opt_upi:'UPI', opt_cheque:'धनादेश',
+    all_status:'सर्व स्थिती', s_confirmed:'पुष्टी झाली', s_pending:'प्रलंबित',
+    s_completed:'पूर्ण झाले', s_cancelled:'रद्द',
     // Payments
-    total_collected: 'एकूण जमा', total_outstanding: 'एकूण देय', total_booking_value: 'एकूण बुकिंग मूल्य',
-    payment_ledger: 'पेमेंट खातेवही', record_payment: '➕ पेमेंट नोंदवा', cleared: '✅ पूर्ण भरलेले',
-    select_booking: '-- बुकिंग निवडा --', amount_to_add: 'रक्कम जोडा (₹)',
-    payment_mode: 'पेमेंट पद्धत', note: 'नोट', confirm_payment: '✅ पेमेंट पुष्टी करा',
-    cash: 'रोख', bank_transfer: 'बँक ट्रान्सफर', upi: 'UPI', cheque: 'धनादेश',
+    total_collected:'एकूण जमा', total_outstanding:'एकूण देय',
+    total_booking_value:'एकूण बुकिंग मूल्य',
+    payment_ledger:'पेमेंट खातेवही', record_payment:'➕ पेमेंट नोंदवा',
+    record_payment_title:'पेमेंट नोंदवा',
+    select_booking_label:'बुकिंग निवडा', amount_to_add:'रक्कम जोडा (₹)',
+    payment_mode:'पेमेंट पद्धत', note_label:'नोट',
+    confirm_payment:'✅ पेमेंट पुष्टी करा', cancel_btn:'रद्द करा',
+    select_booking:'-- बुकिंग निवडा --', cleared_lbl:'✅ पूर्ण भरलेले',
+    pay_btn:'+ भरा',
     // Calendar
-    availability_calendar: 'बुकिंग कॅलेंडर', select_date: 'तारीख निवडा',
-    available: '✅ उपलब्ध – कोणतीही बुकिंग नाही', view_details: 'तपशील पहा',
+    availability_calendar:'बुकिंग कॅलेंडर', select_date:'तारीख निवडा',
+    click_date:'बुकिंग पाहण्यासाठी तारीखेवर क्लिक करा.',
+    legend_today:'⬛ आज', legend_booked:'🟡 बुक केलेले',
+    prev_btn:'‹ मागे', next_btn:'पुढे ›', month_year:'महिना वर्ष',
+    available:'✅ उपलब्ध – कोणतीही बुकिंग नाही', view_details:'तपशील पहा',
+    day_sun:'रवि', day_mon:'सोम', day_tue:'मंगळ', day_wed:'बुध',
+    day_thu:'गुरु', day_fri:'शुक्र', day_sat:'शनि',
     // Reports
-    total_revenue: 'एकूण महसूल', this_month: 'या महिन्यात',
-    event_breakdown: 'कार्यक्रम प्रकारनिहाय', monthly_summary: 'मासिक सारांश',
+    total_revenue:'एकूण महसूल', this_month:'या महिन्यात',
+    event_breakdown:'कार्यक्रम प्रकारनिहाय', monthly_summary:'मासिक सारांश',
     // WhatsApp
-    send_whatsapp: '💬 व्हॉटसॅप संदेश पाठवा', select_booking_wa: '-- बुकिंग निवडा --',
-    message_template: 'संदेश टेम्पलेट', message_label: 'संदेश',
-    open_whatsapp: 'व्हॉटसॅपवर उघडा', message_log: '📜 संदेश लॉग',
-    message_templates: '📋 संदेश टेम्पलेट', no_messages: 'अद्याप कोणताही संदेश पाठवला नाही',
-    choose_template: '-- टेम्पलेट निवडा --',
-    tpl_confirm: '✅ बुकिंग पुष्टी', tpl_reminder: '⏰ पेमेंट स्मरणपत्र',
-    tpl_event: '📅 कार्यक्रम दिवस स्मरण', tpl_payment_rcvd: '💚 पेमेंट मिळाले',
-    tpl_cancelled: '❌ बुकिंग रद्द', tpl_custom: '✍️ सानुकूल संदेश',
+    send_whatsapp:'💬 व्हॉटसॅप संदेश पाठवा',
+    select_booking_wa_label:'बुकिंग / ग्राहक निवडा',
+    select_booking_wa:'-- बुकिंग निवडा --',
+    message_template:'संदेश टेम्पलेट', message_label:'संदेश',
+    open_whatsapp:'व्हॉटसॅपवर उघडा', message_log:'📜 संदेश लॉग',
+    message_templates:'📋 संदेश टेम्पलेट', no_messages:'अद्याप कोणताही संदेश पाठवला नाही',
+    choose_template:'-- टेम्पलेट निवडा --',
+    tpl_confirm:'✅ बुकिंग पुष्टी', tpl_reminder:'⏰ पेमेंट स्मरणपत्र',
+    tpl_event:'📅 कार्यक्रम दिवस स्मरण', tpl_payment_rcvd:'💚 पेमेंट मिळाले',
+    tpl_cancelled:'❌ बुकिंग रद्द', tpl_custom:'✍️ सानुकूल संदेश',
+    tpl_confirm_desc:'नवीन बुकिंग पुष्टी झाल्यावर पाठवा. तारीख, ठिकाण आणि बुकिंग आयडी समाविष्ट.',
+    tpl_reminder_desc:'कार्यक्रमाच्या तारखेपूर्वी प्रलंबित पेमेंटची आठवण करा.',
+    tpl_event_desc:'कार्यक्रमाच्या एक दिवस आधी उबदार स्मरण पाठवा.',
+    tpl_payment_desc:'अपडेट केलेल्या शिल्लकसह पेमेंट पावती द्या.',
+    tpl_cancel_desc:'पुढील चरणांसह ग्राहकाला रद्दीकरणाची माहिती द्या.',
     // Account
-    account_settings: 'खाते सेटिंग्ज', change_password_title: '🔐 पासवर्ड बदला',
-    logged_in_as: 'लॉग इन केलेले:', current_password: 'सध्याचा पासवर्ड',
-    new_password: 'नवीन पासवर्ड', confirm_password: 'नवीन पासवर्ड पुन्हा टाका',
-    update_password: '🔒 पासवर्ड अपडेट करा',
-    // Status tags
-    s_confirmed: 'पुष्टी झाली', s_pending: 'प्रलंबित', s_completed: 'पूर्ण झाले', s_cancelled: 'रद्द',
+    account_settings:'खाते सेटिंग्ज', change_password_title:'🔐 पासवर्ड बदला',
+    logged_in_as:'लॉग इन केलेले:', current_password:'सध्याचा पासवर्ड',
+    new_password:'नवीन पासवर्ड', confirm_password:'नवीन पासवर्ड पुन्हा टाका',
+    update_password:'🔒 पासवर्ड अपडेट करा',
     // Detail modal
-    booking_details: 'बुकिंग तपशील', booking_id: 'बुकिंग आयडी',
-    client_name_d: 'ग्राहकाचे नाव', slot_d: 'वेळ', guests_d: 'अपेक्षित पाहुणे',
-    total_amount_d: 'एकूण रक्कम', amount_paid_d: 'भरलेली रक्कम', amount_due_d: 'देय रक्कम',
-    notes_d: 'नोट्स', close: 'बंद करा', edit: '✏️ संपादित करा',
-    // Toast / alerts
-    fill_required: 'कृपया सर्व आवश्यक माहिती भरा (*)',
-    booking_saved: 'बुकिंग जतन झाली! आयडी: ', booking_updated: 'बुकिंग अपडेट झाली!',
-    booking_deleted: 'बुकिंग हटवली.', payment_recorded: 'पेमेंट नोंदवले: ',
-    pass_incorrect: 'सध्याचा पासवर्ड चुकीचा आहे.',
-    pass_short: 'नवीन पासवर्ड किमान ६ अक्षरांचा असावा.',
-    pass_mismatch: 'पासवर्ड जुळत नाही.',
-    pass_updated: '✅ पासवर्ड यशस्वीरित्या अपडेट झाला!',
-    select_booking_err: 'कृपया बुकिंग निवडा', enter_amount: 'वैध रक्कम प्रविष्ट करा',
-    wa_opened: '💬 व्हॉटसॅप उघडले: ',
-    // Misc
-    owner: 'मालक', employee: 'कर्मचारी',
-    management_portal: 'व्यवस्थापन पोर्टल',
-    accessible: '🌐 वसंत लॉन्स · कोणत्याही डिव्हाइसवरून प्रवेश करा',
-    delete_confirm: 'बुकिंग ', delete_confirm2: ' हटवायची? हे पूर्ववत करता येणार नाही.',
+    booking_details:'बुकिंग तपशील', booking_id:'बुकिंग आयडी',
+    client_name_d:'ग्राहकाचे नाव', slot_d:'वेळ', guests_d:'अपेक्षित पाहुणे',
+    total_amount_d:'एकूण रक्कम', amount_paid_d:'भरलेली रक्कम', amount_due_d:'देय रक्कम',
+    notes_d:'नोट्स', close:'बंद करा', edit_btn:'✏️ संपादित करा', whatsapp_btn:'💬 व्हॉटसॅप',
+    // Firebase
+    fb_connect_title:'Firebase शी जोडा',
+    fb_subtitle:'सर्व डिव्हाइसवर डेटा समक्रमित करण्यासाठी एकवेळ सेटअप',
+    fb_connect_btn:'🔥 जोडा आणि जतन करा', connecting:'डेटाबेसशी जोडत आहे...',
+    fb_hint:'तुमचे कॉन्फिग या ब्राउझरमध्ये जतन केले आहे. इतरांसाठी HTML फाइल शेअर करा.',
+    // Toast
+    saved:'जतन झाले!',
+    fill_required:'कृपया सर्व आवश्यक माहिती भरा (*)',
+    booking_saved:'बुकिंग जतन झाली! आयडी: ', booking_updated:'बुकिंग अपडेट झाली!',
+    booking_deleted:'बुकिंग हटवली.', payment_recorded:'पेमेंट नोंदवले: ',
+    pass_incorrect:'सध्याचा पासवर्ड चुकीचा आहे.',
+    pass_short:'नवीन पासवर्ड किमान ६ अक्षरांचा असावा.',
+    pass_mismatch:'पासवर्ड जुळत नाही.',
+    pass_updated:'✅ पासवर्ड यशस्वीरित्या अपडेट झाला!',
+    select_booking_err:'कृपया बुकिंग निवडा', enter_amount:'वैध रक्कम प्रविष्ट करा',
+    wa_opened:'💬 व्हॉटसॅप उघडले: ',
+    delete_confirm:'बुकिंग ', delete_confirm2:' हटवायची? हे पूर्ववत करता येणार नाही.',
+    // Placeholders
+    ph_name:'पूर्ण नाव', ph_phone:'+91 XXXXX XXXXX', ph_email:'email@example.com',
+    ph_guests:'उदा. ५००', ph_notes:'सजावट प्राधान्ये, केटरिंग नोट्स, इ.',
+    ph_wa_msg:'टेम्पलेट निवडा किंवा सानुकूल संदेश टाइप करा...',
+    ph_curr_pass:'सध्याचा पासवर्ड टाका',
+    ph_new_pass:'नवीन पासवर्ड टाका (किमान ६ अक्षरे)',
+    ph_conf_pass:'नवीन पासवर्ड पुन्हा टाका',
+    ph_pay_note:'ऐच्छिक नोट',
+    ph_login_user:'वापरकर्तानाव टाका', ph_login_pass:'पासवर्ड टाका',
+    ph_search:'🔍  नाव, फोन, कार्यक्रम शोधा...',
+    // Account - new
+    change_username_title:'👤 वापरकर्तानाव बदला',
+    current_username:'सध्याचे वापरकर्तानाव',
+    new_username:'नवीन वापरकर्तानाव',
+    update_username:'✅ वापरकर्तानाव अपडेट करा',
+    username_short:'किमान ३ अक्षरे, फक्त अक्षरे आणि अंक.',
+    username_taken:'वापरकर्तानाव आधीच घेतले आहे.',
+    username_updated:'✅ वापरकर्तानाव अपडेट झाले!',
+    username_invalid:'वापरकर्तानाव ३–२० अक्षरे, फक्त अक्षरे/अंक.',
+    entry_by:'नोंद केली', last_edited_by:'शेवटचे संपादन',
+    // Session
+    session_expired:'सत्र संपले. कृपया पुन्हा लॉग इन करा.',
+    no_permission:'या कृतीसाठी तुम्हाला परवानगी नाही.',
+    stay_logged:'लॉग इन ठेवत आहे',
   }
 };
 
-function t(key){ return (LANG[currentLang] || LANG.en)[key] || LANG.en[key] || key; }
+function t(key){ return (LANG[currentLang]||LANG.en)[key] || LANG.en[key] || key; }
 
 function setLang(lang){
   currentLang = lang;
@@ -1485,103 +1631,170 @@ function setLang(lang){
   document.getElementById('lang-en').classList.toggle('active', lang==='en');
   document.getElementById('lang-mr').classList.toggle('active', lang==='mr');
   applyLang();
-  // Re-render current section
+  // Re-render current active section
   const active = document.querySelector('.section.active');
   if(active){
     const id = active.id.replace('section-','');
     if(id==='dashboard') renderDashboard();
-    if(id==='bookings') renderBookingsTable();
-    if(id==='payments') renderPayments();
-    if(id==='calendar') renderCalendar();
-    if(id==='reports') renderReports();
-    if(id==='whatsapp') initWhatsApp();
-    if(id==='account') initAccount();
-    if(id==='new-booking') applyFormLang();
+    else if(id==='bookings') renderBookingsTable();
+    else if(id==='payments') renderPayments();
+    else if(id==='calendar') renderCalendar();
+    else if(id==='reports') renderReports();
+    else if(id==='whatsapp') initWhatsApp();
+    else if(id==='account') initAccount();
+    else if(id==='new-booking') rebuildFormSelects();
   }
 }
 
 function applyLang(){
-  // Update all data-t elements
+  // 1. All data-t elements
   document.querySelectorAll('[data-t]').forEach(el=>{
-    el.textContent = t(el.getAttribute('data-t'));
+    const key = el.getAttribute('data-t');
+    const val = t(key);
+    if(val) el.textContent = val;
   });
-  // Update topbar date
-  const dateEl = document.getElementById('topbar-date');
-  if(dateEl) dateEl.textContent = new Date().toLocaleDateString(currentLang==='mr'?'mr-IN':'en-IN',{weekday:'short',month:'short',day:'numeric'});
-  // Update section title
+
+  // 2. Rebuild all <select> elements with translated options
+  rebuildAllSelects();
+
+  // 3. Update all placeholders
+  const phs = {
+    'search-input': t('ph_search'),
+    'f-name': t('ph_name'), 'f-phone': t('ph_phone'),
+    'f-email': t('ph_email'), 'f-guests': t('ph_guests'),
+    'f-notes': t('ph_notes'),
+    'f-total': '0', 'f-paid': '0',
+    'wa-message-body': t('ph_wa_msg'),
+    'acc-current-pass': t('ph_curr_pass'),
+    'acc-new-pass': t('ph_new_pass'),
+    'acc-confirm-pass': t('ph_conf_pass'),
+    'pay-note': t('ph_pay_note'),
+    'login-user': t('ph_login_user'),
+    'login-pass': t('ph_login_pass'),
+  };
+  Object.entries(phs).forEach(([id,ph])=>{
+    const el=document.getElementById(id);
+    if(el) el.placeholder=ph;
+  });
+
+  // 4. Section title
   const active = document.querySelector('.section.active');
   if(active){
     const id = active.id.replace('section-','');
     document.getElementById('section-title').textContent = getSectionTitle(id);
   }
-  // Update bottom nav active
-  updateBottomNav();
-  // Update sidebar
-  document.getElementById('user-name-display').textContent = currentUser ? currentUser.name : '';
+
+  // 5. Role badge and user
   const badge = document.getElementById('role-badge');
-  if(badge && currentUser) badge.textContent = currentUser.role==='owner' ? t('owner') : t('employee');
-  // Sidebar footer
-  const mgmt = document.querySelector('.sidebar-logo span');
-  if(mgmt) mgmt.textContent = t('management_portal');
+  if(badge && currentUser){ const rl={owner:t('owner'),manager:t('manager'),employee:t('employee')}; badge.textContent=rl[currentUser.role]||currentUser.role; }
+
+  // 6. Topbar date
+  const dateEl = document.getElementById('topbar-date');
+  if(dateEl) dateEl.textContent = new Date().toLocaleDateString(
+    currentLang==='mr'?'mr-IN':'en-IN',
+    {weekday:'short',month:'short',day:'numeric'}
+  );
+
+  // 7. Lang buttons
+  document.getElementById('lang-en').classList.toggle('active', currentLang==='en');
+  document.getElementById('lang-mr').classList.toggle('active', currentLang==='mr');
+
+  // 8. booking count text
+  const bc = document.getElementById('booking-count');
+  if(bc){ const n=bc.textContent.match(/\d+/); if(n) bc.textContent=n[0]+t('bookings_count_suffix'); }
 }
 
-function applyFormLang(){
-  const setLabel = (id, key) => {
-    const el = document.querySelector(`label[for="${id}"], #${id}`);
-    // find preceding label
-  };
-  // Update form field labels via data-t
-  document.querySelectorAll('[data-t]').forEach(el=>{
-    el.textContent = t(el.getAttribute('data-t'));
-  });
-  // Update select options
+function rebuildAllSelects(){
+  rebuildFormSelects();
+  rebuildFilterSelect();
+  rebuildPayModeSelect();
+  rebuildWaTemplateSelect();
+}
+
+function rebuildFormSelects(){
   const evt = document.getElementById('f-event');
-  if(evt){
-    const cur = evt.value;
-    evt.innerHTML = `<option value="">${t('select_event')}</option>
-      <option value="Wedding">${t('wedding')}</option>
-      <option value="Reception">${t('reception')}</option>
-      <option value="Engagement">${t('engagement')}</option>
-      <option value="Birthday Party">${t('birthday')}</option>
-      <option value="Corporate Event">${t('corporate')}</option>
-      <option value="Haldi / Mehendi">${t('haldi')}</option>
-      <option value="Naming Ceremony">${t('naming')}</option>
-      <option value="Anniversary">${t('anniversary')}</option>
-      <option value="Other">${t('other')}</option>`;
-    if(cur) evt.value = cur;
-  }
+  if(evt){ const c=evt.value;
+    evt.innerHTML=`<option value="">${t('select_event')}</option>
+      <option value="Wedding">${t('opt_wedding')}</option>
+      <option value="Reception">${t('opt_reception')}</option>
+      <option value="Engagement">${t('opt_engagement')}</option>
+      <option value="Birthday Party">${t('opt_birthday')}</option>
+      <option value="Corporate Event">${t('opt_corporate')}</option>
+      <option value="Haldi / Mehendi">${t('opt_haldi')}</option>
+      <option value="Naming Ceremony">${t('opt_naming')}</option>
+      <option value="Anniversary">${t('opt_anniversary')}</option>
+      <option value="Other">${t('opt_other')}</option>`;
+    if(c) evt.value=c; }
+
   const slot = document.getElementById('f-slot');
-  if(slot){
-    const cur = slot.value;
-    slot.innerHTML = `<option>${t('morning')}</option><option>${t('evening')}</option><option>${t('full_day')}</option>`;
-  }
-  const pmMode = document.getElementById('pay-mode');
-  if(pmMode) pmMode.innerHTML = `<option>${t('cash')}</option><option>${t('bank_transfer')}</option><option>${t('upi')}</option><option>${t('cheque')}</option>`;
-  const filterSt = document.getElementById('filter-status');
-  if(filterSt){
-    const cur = filterSt.value;
-    filterSt.innerHTML = `<option value="">${t('all_status')}</option><option>${t('s_confirmed')}</option><option>Pending</option><option>Completed</option><option>Cancelled</option>`;
-  }
+  if(slot){ const c=slot.value;
+    slot.innerHTML=`<option value="Morning (6am–2pm)">${t('opt_morning')}</option>
+      <option value="Evening (4pm–11pm)">${t('opt_evening')}</option>
+      <option value="Full Day">${t('opt_full_day')}</option>`;
+    if(c) slot.value=c; }
+
+  const fs = document.getElementById('f-status');
+  if(fs){ const c=fs.value;
+    fs.innerHTML=`<option value="Confirmed">${t('s_confirmed')}</option>
+      <option value="Pending">${t('s_pending')}</option>
+      <option value="Completed">${t('s_completed')}</option>
+      <option value="Cancelled">${t('s_cancelled')}</option>`;
+    if(c) fs.value=c; }
+}
+
+function rebuildFilterSelect(){
+  const el = document.getElementById('filter-status');
+  if(!el) return;
+  const c=el.value;
+  el.innerHTML=`<option value="">${t('all_status')}</option>
+    <option value="Confirmed">${t('s_confirmed')}</option>
+    <option value="Pending">${t('s_pending')}</option>
+    <option value="Completed">${t('s_completed')}</option>
+    <option value="Cancelled">${t('s_cancelled')}</option>`;
+  if(c) el.value=c;
+}
+
+function rebuildPayModeSelect(){
+  const el = document.getElementById('pay-mode');
+  if(!el) return;
+  const c=el.value;
+  el.innerHTML=`<option value="Cash">${t('opt_cash')}</option>
+    <option value="Bank Transfer">${t('opt_bank')}</option>
+    <option value="UPI">${t('opt_upi')}</option>
+    <option value="Cheque">${t('opt_cheque')}</option>`;
+  if(c) el.value=c;
+}
+
+function rebuildWaTemplateSelect(){
+  const el = document.getElementById('wa-tpl-select');
+  if(!el) return;
+  const c=el.value;
+  el.innerHTML=`<option value="">${t('choose_template')}</option>
+    <option value="confirm">${t('tpl_confirm')}</option>
+    <option value="reminder">${t('tpl_reminder')}</option>
+    <option value="event_reminder">${t('tpl_event')}</option>
+    <option value="payment_received">${t('tpl_payment_rcvd')}</option>
+    <option value="cancelled">${t('tpl_cancelled')}</option>
+    <option value="custom">${t('tpl_custom')}</option>`;
+  if(c) el.value=c;
 }
 
 function getSectionTitle(id){
   const map = {
-    dashboard: t('dashboard'), bookings: t('all_bookings'),
-    'new-booking': t('new_booking'), payments: t('payments'),
-    calendar: t('availability_calendar'), reports: t('reports'),
-    whatsapp: t('send_whatsapp'), account: t('account_settings')
+    dashboard:t('dashboard'), bookings:t('all_bookings'),
+    'new-booking':t('new_booking'), payments:t('payments'),
+    calendar:t('availability_calendar'), reports:t('reports'),
+    whatsapp:t('send_whatsapp'), account:t('account_settings')
   };
-  return map[id] || id;
+  return map[id]||id;
 }
 
 // ── MOBILE NAV ──
 function toggleSidebar(){
-  const sidebar = document.getElementById('main-sidebar');
-  const overlay = document.getElementById('sidebar-overlay');
-  const btn = document.getElementById('hamburger-btn');
-  sidebar.classList.toggle('open');
-  overlay.classList.toggle('show');
-  btn.classList.toggle('open');
+  const s=document.getElementById('main-sidebar'),
+        o=document.getElementById('sidebar-overlay'),
+        b=document.getElementById('hamburger-btn');
+  s.classList.toggle('open'); o.classList.toggle('show'); b.classList.toggle('open');
 }
 function closeSidebar(){
   document.getElementById('main-sidebar').classList.remove('open');
@@ -1589,26 +1802,29 @@ function closeSidebar(){
   document.getElementById('hamburger-btn').classList.remove('open');
 }
 function toggleMore(){
-  const menu = document.getElementById('bnav-more-menu');
-  menu.classList.toggle('show');
+  document.getElementById('bnav-more-menu').classList.toggle('show');
 }
 function closeMore(){
   document.getElementById('bnav-more-menu').classList.remove('show');
 }
 function updateBottomNav(){
-  const active = document.querySelector('.section.active');
+  const active=document.querySelector('.section.active');
   if(!active) return;
-  const id = active.id.replace('section-','');
+  const id=active.id.replace('section-','');
   document.querySelectorAll('.bnav-item').forEach(b=>b.classList.remove('active'));
-  const map = {dashboard:0, bookings:1, 'new-booking':2, calendar:3};
-  const idx = map[id];
-  const items = document.querySelectorAll('.bnav-item');
-  if(idx !== undefined) items[idx]?.classList.add('active');
-  else items[4]?.classList.add('active'); // more
+  const map={dashboard:0,bookings:1,'new-booking':2,calendar:3};
+  const items=document.querySelectorAll('.bnav-item');
+  if(map[id]!==undefined) items[map[id]]?.classList.add('active');
+  else items[4]?.classList.add('active');
 }
 
 const SECTION_TITLES = {};  // dynamic via getSectionTitle()
 function showSection(id){
+  // Block access by role
+  if(id==='new-booking' && !canWrite()) return;
+  if(id==='payments'    && !canSeeAmt()) return;
+  if(id==='whatsapp'    && !canWrite()) return;
+  if(id==='reports'     && !canSeeRep()) return;
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('section-'+id).classList.add('active');
@@ -1649,6 +1865,7 @@ function clearBookingForm(){
 }
 
 async function saveBooking(){
+  if(!canWrite()){ showToast(t('no_permission'), 'error'); return; }
   const name = document.getElementById('f-name').value.trim();
   const phone = document.getElementById('f-phone').value.trim();
   const event = document.getElementById('f-event').value;
@@ -1664,6 +1881,7 @@ async function saveBooking(){
   const due = Math.max(0, total-paid);
   const editId = document.getElementById('edit-booking-id').value;
 
+  const now = new Date().toISOString();
   const bookingObj = {
     name, phone,
     email: document.getElementById('f-email').value.trim(),
@@ -1676,13 +1894,20 @@ async function saveBooking(){
   };
 
   if(editId){
+    const existing = bookings.find(b=>b.id===editId) || {};
     bookingObj.id = editId;
+    bookingObj.entryBy = existing.entryBy || currentUser.username;
+    bookingObj.entryAt = existing.entryAt || now;
+    bookingObj.lastEditBy = currentUser.username;
+    bookingObj.lastEditAt = now;
     await saveData(bookingObj);
     showToast(t('booking_updated'), 'success');
   } else {
     await getCounter();
     const id = 'VL-'+bookingIdCounter++;
     bookingObj.id = id;
+    bookingObj.entryBy = currentUser.username;
+    bookingObj.entryAt = now;
     await saveData(bookingObj);
     await saveCounter();
     showToast(t('booking_saved')+id, 'success');
@@ -1713,6 +1938,7 @@ function editBooking(id){
 }
 
 async function deleteBooking(id){
+  if(!canDelete()){ showToast(t('no_permission'), 'error'); return; }
   if(!confirm(t('delete_confirm')+id+t('delete_confirm2'))) return;
   await deleteFromDB(id);
   showToast(t('booking_deleted'), 'error');
@@ -1739,8 +1965,8 @@ function renderBookingsTable(){
   });
   list.sort((a,b)=>new Date(b.bookingDate)-new Date(a.bookingDate));
   const tbody = document.getElementById('bookings-table-body');
-  document.getElementById('booking-count').textContent=list.length+' bookings';
-  if(!list.length){ tbody.innerHTML='<tr><td colspan="11" class="no-data">No bookings found</td></tr>'; return; }
+  document.getElementById('booking-count').textContent=list.length+t('bookings_count_suffix');
+  if(!list.length){ tbody.innerHTML='<tr><td colspan="11" class="no-data"><span data-t="no_bookings_found">No bookings found</span></td></tr>'; return; }
   tbody.innerHTML = list.map(b=>`
     <tr>
       <td><b>${b.id}</b></td>
@@ -1749,15 +1975,17 @@ function renderBookingsTable(){
       <td>${fmtDate(b.bookingDate)}</td>
       <td><b>${fmtDate(b.eventDate)}</b></td>
       <td>${b.event}</td>
-      <td class="amt amt-total">${fmtAmt(b.total)}</td>
-      <td class="amt amt-paid">${fmtAmt(b.paid)}</td>
-      <td class="amt amt-due">${fmtAmt(b.due)}</td>
+      ${canSeeAmt()?`<td class="amt amt-total">${fmtAmt(b.total)}</td><td class="amt amt-paid">${fmtAmt(b.paid)}</td><td class="amt amt-due">${fmtAmt(b.due)}</td>`:''}
       <td>${statusTag(b.status)}</td>
+      <td style="font-size:11px;color:var(--muted);white-space:nowrap;">
+        <span title="${b.entryAt ? new Date(b.entryAt).toLocaleString() : ''}">${b.entryBy||'—'}</span>
+        ${b.lastEditBy && b.lastEditBy!==b.entryBy?`<br><span style="color:var(--gold);font-size:10px;">✏ ${b.lastEditBy}</span>`:''}
+      </td>
       <td style="white-space:nowrap;">
         <button class="btn btn-sm btn-outline" onclick="viewDetail('${b.id}')">👁</button>
-        <button class="btn btn-sm btn-primary" onclick="editBooking('${b.id}')">✏️</button>
-        <button class="btn-wa" style="padding:5px 10px;font-size:11px;" onclick="quickWa('${b.id}')">💬</button>
-        ${currentUser.role==='owner'?`<button class="btn btn-sm btn-danger" onclick="deleteBooking('${b.id}')">🗑</button>`:''}
+        ${canWrite()?`<button class="btn btn-sm btn-primary" onclick="editBooking('${b.id}')">✏️</button>`:''}
+        ${canWrite()?`<button class="btn-wa" style="padding:5px 10px;font-size:11px;" onclick="quickWa('${b.id}')">💬</button>`:''}
+        ${canDelete()?`<button class="btn btn-sm btn-danger" onclick="deleteBooking('${b.id}')">🗑</button>`:''}
       </td>
     </tr>`).join('');
 }
@@ -1769,18 +1997,20 @@ function renderDashboard(){
   const due=bookings.reduce((s,b)=>s+(b.due||0),0);
   document.getElementById('stat-total').textContent=total;
   document.getElementById('stat-confirmed').textContent=confirmed;
-  document.getElementById('stat-collected').textContent=fmtAmt(collected);
-  document.getElementById('stat-due').textContent=fmtAmt(due);
+  if(canSeeAmt()){
+    document.getElementById('stat-collected').textContent=fmtAmt(collected);
+    document.getElementById('stat-due').textContent=fmtAmt(due);
+  }
 
   const recent=[...bookings].sort((a,b)=>new Date(b.bookingDate)-new Date(a.bookingDate)).slice(0,6);
   const tbody=document.getElementById('recent-bookings-body');
-  if(!recent.length){ tbody.innerHTML='<tr><td colspan="5" class="no-data">No bookings yet</td></tr>'; }
+  if(!recent.length){ tbody.innerHTML='<tr><td colspan="5" class="no-data"><span data-t="no_bookings_yet">No bookings yet</span></td></tr>'; }
   else { tbody.innerHTML=recent.map(b=>`<tr><td><b>${b.name}</b></td><td>${fmtDate(b.eventDate)}</td><td>${b.event}</td><td>${statusTag(b.status)}</td><td class="amt amt-due">${fmtAmt(b.due)}</td></tr>`).join(''); }
 
   const today=new Date(); today.setHours(0,0,0,0);
   const upcoming=[...bookings].filter(b=>{ const d=new Date(b.eventDate); d.setHours(0,0,0,0); return d>=today && b.status!=='Cancelled'; }).sort((a,b)=>new Date(a.eventDate)-new Date(b.eventDate)).slice(0,5);
   const ulist=document.getElementById('upcoming-list');
-  if(!upcoming.length){ ulist.innerHTML='<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">No upcoming events</p>'; }
+  if(!upcoming.length){ ulist.innerHTML='<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;"><span data-t="no_upcoming">No upcoming events</span></p>'; }
   else { ulist.innerHTML=upcoming.map(b=>`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);">
       <div><b style="font-size:13px;">${b.name}</b><br><span style="font-size:11px;color:var(--muted);">${b.event} · ${b.slot}</span></div>
@@ -1791,30 +2021,42 @@ function renderDashboard(){
 // ══════════════════════════════════════════
 //  DETAIL MODAL
 // ══════════════════════════════════════════
+function buildDetailHTML(b){
+  const editedRow = (b.lastEditBy && b.lastEditBy !== b.entryBy)
+    ? '<div class="detail-item"><label>' + t('last_edited_by') + '</label><span>' + (b.lastEditBy||'') + ' <small style="color:var(--muted);">(' + fmtDate((b.lastEditAt||'').split('T')[0]) + ')</small></span></div>'
+    : '';
+  const notesRow = b.notes
+    ? '<div style="margin-top:14px;padding:12px 14px;background:var(--gold-pale);border-radius:8px;font-size:13px;color:var(--brown);"><b>' + t('notes_d') + ':</b> ' + b.notes + '</div>'
+    : '';
+  const entryDate = b.entryAt ? ' <small style="color:var(--muted);">(' + fmtDate(b.entryAt.split('T')[0]) + ')</small>' : '';
+  return '<div class="detail-grid">'
+    + '<div class="detail-item"><label>' + t('booking_id') + '</label><span>' + b.id + '</span></div>'
+    + '<div class="detail-item"><label>' + t('status') + '</label><span>' + statusTag(b.status) + '</span></div>'
+    + '<div class="detail-item"><label>' + t('client_name_d') + '</label><span>' + b.name + '</span></div>'
+    + '<div class="detail-item"><label>' + t('phone') + '</label><span>' + b.phone + '</span></div>'
+    + '<div class="detail-item"><label>' + t('email') + '</label><span>' + (b.email||'—') + '</span></div>'
+    + '<div class="detail-item"><label>' + t('event_type') + '</label><span>' + b.event + '</span></div>'
+    + '<div class="detail-item"><label>' + t('booking_date') + '</label><span>' + fmtDate(b.bookingDate) + '</span></div>'
+    + '<div class="detail-item"><label>' + t('event_date') + '</label><span><b>' + fmtDate(b.eventDate) + '</b></span></div>'
+    + '<div class="detail-item"><label>' + t('slot_d') + '</label><span>' + b.slot + '</span></div>'
+    + '<div class="detail-item"><label>' + t('guests_d') + '</label><span>' + (b.guests||'—') + '</span></div>'
+    + '<div class="detail-item"><label>' + t('entry_by') + '</label><span>' + (b.entryBy||'—') + entryDate + '</span></div>'
+    + editedRow
+    + '</div>'
+    + (canSeeAmt() ? '<div class="fin-summary">'
+    + '<div class="fin-row"><span>' + t('total_amount_d') + '</span><span class="amt amt-total">' + fmtAmt(b.total) + '</span></div>'
+    + '<div class="fin-row"><span class="paid-lbl">' + t('amount_paid_d') + '</span><span class="amt amt-paid">' + fmtAmt(b.paid) + '</span></div>'
+    + '<div class="fin-row total"><span class="due">' + t('amount_due_d') + '</span><span class="amt amt-due">' + fmtAmt(b.due) + '</span></div>'
+    + '</div>' : '')
+    + notesRow;
+}
+
 function viewDetail(id){
   const b=bookings.find(x=>x.id===id);
   if(!b) return;
   viewingBookingId=id;
-  document.getElementById('detail-modal-body').innerHTML=`
-    <div class="detail-grid">
-      <div class="detail-item"><label>Booking ID</label><span>${b.id}</span></div>
-      <div class="detail-item"><label>Status</label><span>${statusTag(b.status)}</span></div>
-      <div class="detail-item"><label>Client Name</label><span>${b.name}</span></div>
-      <div class="detail-item"><label>Phone</label><span>${b.phone}</span></div>
-      <div class="detail-item"><label>Email</label><span>${b.email||'—'}</span></div>
-      <div class="detail-item"><label>Event Type</label><span>${b.event}</span></div>
-      <div class="detail-item"><label>Booking Date</label><span>${fmtDate(b.bookingDate)}</span></div>
-      <div class="detail-item"><label>Event Date</label><span><b>${fmtDate(b.eventDate)}</b></span></div>
-      <div class="detail-item"><label>Slot</label><span>${b.slot}</span></div>
-      <div class="detail-item"><label>Expected Guests</label><span>${b.guests||'—'}</span></div>
-    </div>
-    <div class="fin-summary">
-      <div class="fin-row"><span>Total Amount</span><span class="amt amt-total">${fmtAmt(b.total)}</span></div>
-      <div class="fin-row"><span class="paid-lbl">Amount Paid</span><span class="amt amt-paid">${fmtAmt(b.paid)}</span></div>
-      <div class="fin-row total"><span class="due">Amount Due</span><span class="amt amt-due">${fmtAmt(b.due)}</span></div>
-    </div>
-    ${b.notes?`<div style="margin-top:14px;padding:12px 14px;background:var(--gold-pale);border-radius:8px;font-size:13px;color:var(--brown);"><b>Notes:</b> ${b.notes}</div>`:''}`;
-  openModal('detail-modal');
+  document.getElementById('detail-modal-body').innerHTML = buildDetailHTML(b);
+    openModal('detail-modal');
 }
 
 function editFromDetail(){
@@ -1826,6 +2068,7 @@ function editFromDetail(){
 //  PAYMENTS
 // ══════════════════════════════════════════
 function renderPayments(){
+  if(!canSeeAmt()){ showSection('dashboard'); return; }
   const tbody=document.getElementById('payments-body');
   const list=[...bookings].sort((a,b)=>new Date(b.eventDate)-new Date(a.eventDate));
   const totalCollected=bookings.reduce((s,b)=>s+(b.paid||0),0);
@@ -1843,8 +2086,8 @@ function renderPayments(){
       <td class="amt amt-paid">${fmtAmt(b.paid)}</td>
       <td class="amt ${b.due>0?'amt-due':''}">${fmtAmt(b.due)}</td>
       <td>${statusTag(b.status)}</td>
-      <td>${b.due>0?`<button class="btn btn-sm btn-success" onclick="openPayModalFor('${b.id}')">+ Pay</button>`:
-        `<span style="color:var(--green);font-size:12px;font-weight:600;">✅ Cleared</span>`}</td>
+      <td>${b.due>0?`<button class="btn btn-sm btn-success" onclick="openPayModalFor('${b.id}')">${t("pay_btn")}</button>`:
+        `<span style="color:var(--green);font-size:12px;font-weight:600;">${t("cleared_lbl")}</span>`}</td>
     </tr>`).join('');
 }
 
@@ -1869,6 +2112,7 @@ function fillPayInfo(){
 }
 
 async function recordPayment(){
+  if(!canSeeAmt()){ showToast(t('no_permission'), 'error'); return; }
   const id=document.getElementById('pay-booking-select').value;
   const amt=parseFloat(document.getElementById('pay-amount').value)||0;
   if(!id){ showToast(t('select_booking_err'), 'error'); return; }
@@ -1915,7 +2159,7 @@ function showDayDetail(y,m,d){
   const dayBookings=bookings.filter(b=>b.eventDate===dateStr&&b.status!=='Cancelled');
   document.getElementById('cal-detail-title').textContent=`${d} ${months[m]} ${y}`;
   const body=document.getElementById('cal-detail-body');
-  if(!dayBookings.length){ body.innerHTML='<p style="color:var(--green-light);font-size:13px;font-weight:600;">✅ Available – No bookings</p>'; return; }
+  if(!dayBookings.length){ body.innerHTML=`<p style="color:var(--green-light);font-size:13px;font-weight:600;">${t('available')}</p>`; return; }
   body.innerHTML=dayBookings.map(b=>`
     <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -1923,7 +2167,7 @@ function showDayDetail(y,m,d){
       </div>
       <div style="font-size:12px;color:var(--muted);">${b.event} · ${b.slot}</div>
       <div style="font-size:12px;margin-top:4px;color:var(--red);">Due: ${fmtAmt(b.due)}</div>
-      <button class="btn btn-sm btn-outline" style="margin-top:8px;" onclick="viewDetail('${b.id}')">View Details</button>
+      <button class="btn btn-sm btn-outline" style="margin-top:8px;" onclick="viewDetail('${b.id}')">${t('view_details')}</button>
     </div>`).join('');
 }
 
@@ -1931,6 +2175,7 @@ function showDayDetail(y,m,d){
 //  REPORTS
 // ══════════════════════════════════════════
 function renderReports(){
+  if(!canSeeRep()){ showSection('dashboard'); return; }
   const totalRev=bookings.filter(b=>b.status!=='Cancelled').reduce((s,b)=>s+(b.paid||0),0);
   const now=new Date();
   const thisMonth=bookings.filter(b=>{ const d=new Date(b.eventDate); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()&&b.status!=='Cancelled'; }).reduce((s,b)=>s+(b.paid||0),0);
@@ -1983,43 +2228,78 @@ function showToast(msg, type='success'){
 
 
 // ══════════════════════════════════════════
-//  ACCOUNT / PASSWORD CHANGE
+//  ACCOUNT / PASSWORD CHANGE  (Firebase Auth)
 // ══════════════════════════════════════════
-// Passwords are stored per-user in localStorage so they persist across sessions
-// (for cloud use, swap localStorage with your backend API)
-function getUserPassKey(u){ return 'vl_pass_' + u; }
 
-function getUserPassword(u){
-  return localStorage.getItem(getUserPassKey(u)) || USERS[u].pass;
+async function changeUsername(){
+  const newU = document.getElementById('acc-new-user').value.trim().toLowerCase();
+  if(!newU || newU.length < 3 || newU.length > 20 || !/^[a-z0-9]+$/.test(newU)){
+    showToast(t('username_invalid'), 'error'); return;
+  }
+  if(newU === currentUser.username){ showToast(t('username_taken'), 'error'); return; }
+
+  // Check if username is already taken in users_map
+  if(window._firebaseReady){
+    const snap = await window._firebase.getDoc(fbDoc('users_map', newU));
+    if(snap.exists()){ showToast(t('username_taken'), 'error'); return; }
+  }
+
+  if(window._firebaseReady){
+    const uid = currentUser.uid;
+    const email = window._auth.currentUser.email;
+    // Write new mapping, delete old one
+    await window._firebase.setDoc(fbDoc('users_map', newU), { email, uid });
+    await window._firebase.deleteDoc(fbDoc('users_map', currentUser.username));
+    // Update profile doc
+    await window._firebase.setDoc(fbDoc('users', uid), {
+      username: newU, role: currentUser.role, name: currentUser.name, email
+    });
+  }
+  currentUser.username = newU;
+  document.getElementById('acc-curr-user').value = newU;
+  document.getElementById('acc-username-display').textContent = newU;
+  document.getElementById('acc-new-user').value = '';
+  showToast(t('username_updated'), 'success');
 }
 
 function initAccount(){
   document.getElementById('acc-username-display').textContent = currentUser.username;
-  document.getElementById('acc-role-display').textContent = currentUser.role === 'owner' ? '👑 Owner' : '👤 Employee';
+  document.getElementById('acc-role-display').textContent = currentUser.role === 'owner'
+    ? ('👑 ' + t('owner')) : ('👤 ' + t('employee'));
+  document.getElementById('acc-curr-user').value = currentUser.username;
+  document.getElementById('acc-new-user').value = '';
   document.getElementById('acc-current-pass').value = '';
   document.getElementById('acc-new-pass').value = '';
   document.getElementById('acc-confirm-pass').value = '';
 }
 
-function changePassword(){
+async function changePassword(){
   const current = document.getElementById('acc-current-pass').value;
   const newPass  = document.getElementById('acc-new-pass').value;
   const confirm  = document.getElementById('acc-confirm-pass').value;
 
-  const actual = getUserPassword(currentUser.username);
-  if(current !== actual){ showToast(t('pass_incorrect'), 'error'); return; }
   if(newPass.length < 6){ showToast(t('pass_short'), 'error'); return; }
   if(newPass !== confirm){ showToast(t('pass_mismatch'), 'error'); return; }
 
-  localStorage.setItem(getUserPassKey(currentUser.username), newPass);
-  // Also persist to Firestore
-  if(window._firebaseReady){
-    window._firebase.setDoc(window._firebase.doc(db(),'passwords',currentUser.username),{pass:newPass});
+  const user = window._auth && window._auth.currentUser;
+  if(!user){ showToast('Not authenticated', 'error'); return; }
+
+  try {
+    // Re-authenticate first (required by Firebase before sensitive operations)
+    const credential = window._fbAuth.EmailAuthProvider.credential(user.email, current);
+    await window._fbAuth.reauthenticateWithCredential(user, credential);
+    await window._fbAuth.updatePassword(user, newPass);
+    document.getElementById('acc-current-pass').value = '';
+    document.getElementById('acc-new-pass').value = '';
+    document.getElementById('acc-confirm-pass').value = '';
+    showToast(t('pass_updated'), 'success');
+  } catch(e){
+    if(e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential'){
+      showToast(t('pass_incorrect'), 'error');
+    } else {
+      showToast('Error: ' + (e.message || 'Could not update password'), 'error');
+    }
   }
-  document.getElementById('acc-current-pass').value = '';
-  document.getElementById('acc-new-pass').value = '';
-  document.getElementById('acc-confirm-pass').value = '';
-  showToast(t('pass_updated'), 'success');
 }
 
 // ══════════════════════════════════════════
@@ -2188,7 +2468,7 @@ function sendWaMessage(){
 function renderWaLog(){
   const el = document.getElementById('wa-log-list');
   if(!el) return;
-  if(!waLog.length){ el.innerHTML='<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">No messages sent yet</p>'; return; }
+  if(!waLog.length){ el.innerHTML='<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;"><span data-t="no_messages">No messages sent yet</span></p>'; return; }
   el.innerHTML = waLog.map(l=>`
     <div class="wa-log-item sent">
       <span style="font-size:18px;">✅</span>
@@ -2213,40 +2493,7 @@ function waFromDetail(){
   quickWa(viewingBookingId);
 }
 
-// ── Firebase config ──
-function saveFbConfig(){
-  const cfg = {
-    apiKey:            document.getElementById('fb-apiKey').value.trim(),
-    authDomain:        document.getElementById('fb-authDomain').value.trim(),
-    projectId:         document.getElementById('fb-projectId').value.trim(),
-    storageBucket:     document.getElementById('fb-storageBucket').value.trim(),
-    messagingSenderId: document.getElementById('fb-messagingSenderId').value.trim(),
-    appId:             document.getElementById('fb-appId').value.trim(),
-  };
-  if(!cfg.apiKey || !cfg.projectId){
-    const err = document.getElementById('fb-error');
-    err.textContent = 'Please fill in at least API Key and Project ID.';
-    err.style.display = 'block'; return;
-  }
-  localStorage.setItem('vl_fb_config', JSON.stringify(cfg));
-  showLoading('Connecting to Firebase...');
-  window.tryInitFirebase();
-  // Give Firebase a moment to init
-  let attempts2 = 0;
-  const poll2 = setInterval(()=>{
-    attempts2++;
-    if(window._firebaseReady){
-      clearInterval(poll2);
-      hideLoading();
-      showLoginPage();
-    } else if(attempts2 > 30){
-      clearInterval(poll2);
-      hideLoading();
-      document.getElementById('fb-error').textContent = 'Could not connect. Please double-check your config values and try again.';
-      document.getElementById('fb-error').style.display = 'block';
-    }
-  }, 100);
-}
+// ── Firebase config is hardcoded — no setup page needed ──
 
 function showLoading(msg='Loading...'){
   document.getElementById('loading-text').textContent = msg;
@@ -2256,53 +2503,35 @@ function hideLoading(){
   document.getElementById('loading-overlay').style.display = 'none';
 }
 
-function showLoginPage(){
-  document.getElementById('fb-setup-page').classList.remove('show');
-  document.getElementById('login-page').style.display = 'flex';
-}
-
 // ── Startup ──
 window.addEventListener('load', ()=>{
   document.getElementById('f-booking-date').value = new Date().toISOString().split('T')[0];
+  showLoading(LANG[currentLang||'en'].connecting || 'Connecting to database...');
 
-  const cfg = localStorage.getItem('vl_fb_config');
-  if(!cfg){
-    // No Firebase config — show setup wizard
-    document.getElementById('fb-setup-page').classList.add('show');
-    return;
-  }
-
-  // Firebase config exists — show loading, wait for Firebase to be ready then show login
-  showLoading('Connecting to database...');
-
-  function onReady(){
+  // Firebase Auth automatically restores session — no manual session handling needed
+  window._fbAuth.onAuthStateChanged(window._auth, async (firebaseUser) => {
+    if(firebaseUser){
+      try {
+        const snap = await window._firebase.getDoc(fbDoc('users', firebaseUser.uid));
+        if(snap.exists()){
+          const d = snap.data();
+          currentUser = { uid: firebaseUser.uid, username: d.username, name: d.name, role: d.role, email: firebaseUser.email };
+          hideLoading();
+          document.getElementById('login-page').style.display = 'none';
+          document.getElementById('app').classList.add('visible');
+          initApp();
+          return;
+        }
+      } catch(e){ console.warn('Profile fetch failed:', e); }
+    }
     hideLoading();
     document.getElementById('login-page').style.display = 'flex';
-  }
-
-  if(window._firebaseReady){
-    onReady();
-  } else {
-    // Module scripts run async — poll until ready or timeout
-    let attempts = 0;
-    const poll = setInterval(()=>{
-      attempts++;
-      if(window._firebaseReady){
-        clearInterval(poll);
-        onReady();
-      } else if(attempts > 40){ // 4 seconds max
-        clearInterval(poll);
-        hideLoading();
-        // Show login anyway — app still works, just not synced
-        document.getElementById('login-page').style.display = 'flex';
-      }
-    }, 100);
-  }
+  });
 });
 
-// Allow resetting Firebase config from console: resetFirebase()
-window.resetFirebase = function(){
-  localStorage.removeItem('vl_fb_config');
+// Allow resetting from browser console if needed: resetApp()
+window.resetApp = function(){
+  window._fbAuth.signOut(window._auth);
   location.reload();
 };
 </script>
