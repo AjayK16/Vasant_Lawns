@@ -776,6 +776,19 @@
           <div class="card-header"><h4 id="booking-form-title"><span data-t="new_booking">New Booking</span></h4></div>
           <div class="modal-body">
             <input type="hidden" id="edit-booking-id">
+            <div class="form-row" style="margin-bottom:16px;">
+              <div class="field">
+                <label style="display:flex;align-items:center;gap:6px;">
+                  🧾 Invoice No.
+                  <span style="font-size:10px;color:var(--green);font-weight:500;background:#e8f5e9;padding:2px 7px;border-radius:10px;">Auto</span>
+                </label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <input type="text" id="f-invoice-no" placeholder="e.g. VL-1001" style="flex:1;">
+                  <button type="button" onclick="resetInvoiceNo()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--cream);font-size:12px;cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif;color:var(--muted);" title="Reset to auto-generated">↺ Auto</button>
+                </div>
+                <p style="font-size:11px;color:var(--muted);margin-top:4px;">Auto-generated. You can override it manually.</p>
+              </div>
+            </div>
             <div class="form-row">
               <div class="field">
                 <label><span data-t="full_name">Client Name *</span></label>
@@ -1896,6 +1909,20 @@ function clearBookingForm(){
   document.getElementById('f-event-date').value='';
   document.getElementById('edit-booking-id').value='';
   document.getElementById('booking-form-title').textContent='New Booking';
+  // Pre-fill invoice no with next auto ID
+  previewNextInvoiceNo();
+}
+
+async function previewNextInvoiceNo(){
+  await getCounter();
+  const el = document.getElementById('f-invoice-no');
+  if(el){ el.value = ''; el.placeholder = 'VL-' + bookingIdCounter + ' (auto)'; el.readOnly = false; el.style.background=''; el.style.color=''; }
+}
+
+async function resetInvoiceNo(){
+  await getCounter();
+  const el = document.getElementById('f-invoice-no');
+  if(el){ el.value = ''; el.placeholder = 'VL-' + bookingIdCounter + ' (auto)'; }
 }
 
 async function saveBooking(){
@@ -1937,13 +1964,26 @@ async function saveBooking(){
     await saveData(bookingObj);
     showToast(t('booking_updated'), 'success');
   } else {
-    await getCounter();
-    const id = 'VL-'+bookingIdCounter++;
+    // Use manual invoice no if provided, otherwise auto-generate
+    const manualId = document.getElementById('f-invoice-no').value.trim();
+    let id = '';
+    if(manualId){
+      // Check for duplicate
+      const duplicate = bookings.find(b => b.id === manualId);
+      if(duplicate){
+        showToast('Invoice No. ' + manualId + ' already exists. Please use a different one.', 'error');
+        return;
+      }
+      id = manualId;
+    } else {
+      await getCounter();
+      id = 'VL-'+bookingIdCounter++;
+      await saveCounter();
+    }
     bookingObj.id = id;
     bookingObj.entryBy = currentUser.username;
     bookingObj.entryAt = now;
     await saveData(bookingObj);
-    await saveCounter();
     showToast(t('booking_saved')+id, 'success');
   }
   clearBookingForm();
@@ -1956,6 +1996,9 @@ function editBooking(id){
   showSection('new-booking');
   document.getElementById('booking-form-title').textContent='Edit Booking — '+b.id;
   document.getElementById('edit-booking-id').value=b.id;
+  // Show current invoice ID (readonly when editing)
+  const invEl = document.getElementById('f-invoice-no');
+  if(invEl){ invEl.value = b.id; invEl.readOnly = true; invEl.style.background='var(--gold-pale)'; invEl.style.color='var(--muted)'; }
   document.getElementById('f-name').value=b.name;
   document.getElementById('f-phone').value=b.phone;
   document.getElementById('f-email').value=b.email||'';
