@@ -61,11 +61,16 @@
   #login-page {
     min-height: 100vh;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     background: linear-gradient(135deg, #1A1208 0%, #3D2B10 50%, #1A1208 100%);
     position: relative;
-    overflow: hidden;
+    overflow-y: auto;
+    padding: 24px 16px;
+  }
+  .login-card { margin: auto; }
+  @media(max-width:480px){
+    .login-card { padding: 32px 24px; }
   }
   #login-page::before {
     content: '';
@@ -134,7 +139,8 @@
   .login-error { color: var(--red); font-size: 13px; margin-top: 10px; text-align: center; display:none; }
 
   /* ── MAIN APP ───────────────────────────────── */
-  html, body { height: 100%; overflow: hidden; }
+  html, body { height: 100%; }
+  body.app-active { overflow: hidden; }
   #app { display: none; height: 100vh; overflow: hidden; }
   #app.visible { display: flex; }
 
@@ -444,16 +450,23 @@
 
   /* ── FIREBASE SETUP ── */
   #fb-setup-page {
-    min-height: 100vh; display: none; align-items: center; justify-content: center;
+    min-height: 100vh; display: none;
+    align-items: flex-start; justify-content: center;
     background: linear-gradient(135deg, #1A1208 0%, #3D2B10 100%);
-    position: relative; overflow: hidden;
+    position: relative; overflow-y: auto;
+    padding: 24px 16px;
   }
   #fb-setup-page.show { display: flex; }
   .fb-card {
-    background: var(--white); border-radius: 20px; padding: 36px 40px;
-    width: 560px; max-width: 95vw;
+    background: var(--white); border-radius: 20px; padding: 32px 28px;
+    width: 560px; max-width: 100%;
     box-shadow: 0 20px 80px rgba(0,0,0,0.4);
     border-top: 4px solid #FF6B00;
+    margin: auto;
+  }
+  @media(max-width:600px){
+    .fb-card { padding: 24px 18px; border-radius: 14px; }
+    #fb-setup-page { padding: 16px 12px; }
   }
   .fb-step { display:flex; align-items:flex-start; gap:14px; margin-bottom:16px; padding:14px; background:var(--gold-pale); border-radius:10px; font-size:13px; line-height:1.6; }
   .fb-step-num { background:var(--gold); color:var(--deep); font-weight:800; font-size:12px; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
@@ -1123,6 +1136,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Enter' && document.getElem
 
 function doLogout(){
   currentUser=null;
+  document.body.classList.remove('app-active');
   document.getElementById('login-page').style.display='flex';
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-user').value='';
@@ -1139,6 +1153,7 @@ function initApp(){
   });
   document.getElementById('topbar-date').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   // Subscribe to real-time updates
+  document.body.classList.add('app-active');
   subscribeBookings();
   showSection('dashboard');
 }
