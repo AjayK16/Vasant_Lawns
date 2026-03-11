@@ -378,19 +378,105 @@
   .cal-nav button:hover { border-color:var(--gold); color:var(--gold); }
   .cal-nav h4 { font-family:'Playfair Display',serif; font-size:18px; color:var(--deep); }
 
-  /* Responsive */
-  @media(max-width:900px){
-    .sidebar{ width:220px; }
-    .main{ margin-left:220px; }
-    .stats-grid{ grid-template-columns:repeat(2,1fr); }
-    .content{ padding:16px 14px; }
+  /* ── MOBILE LAYOUT ── */
+  /* Hamburger button */
+  .hamburger {
+    display:none; background:none; border:none; cursor:pointer;
+    padding:6px; border-radius:8px; color:var(--deep);
+    flex-direction:column; gap:5px; margin-right:8px;
   }
-  @media(max-width:640px){
-    .sidebar{ transform:translateX(-100%); }
-    .main{ margin-left:0; }
-    .stats-grid{ grid-template-columns:1fr 1fr; }
-    .form-row{ grid-template-columns:1fr; }
-    .detail-grid{ grid-template-columns:1fr; }
+  .hamburger span { display:block; width:22px; height:2px; background:var(--deep); border-radius:2px; transition:all 0.3s; }
+  .hamburger.open span:nth-child(1){ transform:translateY(7px) rotate(45deg); }
+  .hamburger.open span:nth-child(2){ opacity:0; }
+  .hamburger.open span:nth-child(3){ transform:translateY(-7px) rotate(-45deg); }
+
+  /* Sidebar overlay */
+  .sidebar-overlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,0.55); z-index:99;
+    backdrop-filter:blur(2px);
+  }
+  .sidebar-overlay.show { display:block; }
+
+  /* Bottom nav for mobile */
+  .bottom-nav {
+    display:none; position:fixed; bottom:0; left:0; right:0;
+    background:var(--deep); z-index:98; border-top:1px solid rgba(201,151,58,0.2);
+    padding:0; safe-area-inset-bottom:env(safe-area-inset-bottom);
+  }
+  .bottom-nav-items {
+    display:flex; justify-content:space-around; align-items:stretch;
+  }
+  .bnav-item {
+    flex:1; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; padding:8px 4px 6px;
+    color:rgba(255,255,255,0.5); font-size:10px; font-weight:600;
+    cursor:pointer; border:none; background:none;
+    text-transform:uppercase; letter-spacing:0.4px; gap:3px;
+    transition:color 0.2s; border-top:2px solid transparent;
+  }
+  .bnav-item .bicon { font-size:20px; line-height:1; }
+  .bnav-item.active { color:var(--gold-light); border-top-color:var(--gold); }
+  .bnav-more-menu {
+    display:none; position:fixed; bottom:56px; right:0; left:0;
+    background:var(--deep); border-top:1px solid rgba(201,151,58,0.2);
+    z-index:97; padding:8px 0;
+  }
+  .bnav-more-menu.show { display:block; }
+  .bnav-more-item {
+    display:flex; align-items:center; gap:12px;
+    padding:12px 24px; color:rgba(255,255,255,0.75); font-size:14px;
+    cursor:pointer; border:none; background:none; width:100%;
+    font-family:'DM Sans',sans-serif;
+  }
+  .bnav-more-item:hover, .bnav-more-item.active { color:var(--gold-light); background:rgba(201,151,58,0.1); }
+
+  @media(max-width:768px){
+    .hamburger { display:flex; }
+    .sidebar {
+      transform:translateX(-100%); transition:transform 0.3s ease;
+      width:280px; z-index:100;
+    }
+    .sidebar.open { transform:translateX(0); }
+    .main { margin-left:0; }
+    .content { padding:14px 12px; padding-bottom:72px; }
+    .topbar { padding:12px 14px; }
+    .topbar h3 { font-size:17px; }
+    .stats-grid { grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+    .stat-card { padding:12px 12px; }
+    .stat-value { font-size:20px; }
+    .stat-icon { font-size:20px; margin-bottom:6px; }
+    .form-row { grid-template-columns:1fr; gap:10px; }
+    .form-row.three { grid-template-columns:1fr; }
+    .detail-grid { grid-template-columns:1fr; }
+    .bottom-nav { display:block; }
+    /* Stack dashboard grids on mobile */
+    #section-dashboard > div:last-child { grid-template-columns:1fr !important; }
+    /* Stack calendar on mobile */
+    #section-calendar > div { grid-template-columns:1fr !important; }
+    /* Stack reports on mobile */
+    #section-reports > div:last-child { grid-template-columns:1fr !important; }
+    /* Stack whatsapp on mobile */
+    #section-whatsapp > div { grid-template-columns:1fr !important; }
+    /* Tables - horizontal scroll */
+    .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    table { min-width:600px; }
+    /* Modal full screen on mobile */
+    .modal { width:100% !important; max-width:100%; border-radius:16px 16px 0 0; position:fixed; bottom:0; left:0; right:0; margin:0; max-height:92vh; }
+    .modal-overlay { align-items:flex-end; }
+    /* Hide cloud badge on mobile */
+    .cloud-badge { display:none; }
+    /* Topbar date shorter */
+    .topbar-date { font-size:11px; }
+    /* Lang toggle in topbar */
+    .lang-toggle { padding:4px 8px; font-size:11px; }
+  }
+
+  @media(max-width:900px) and (min-width:769px){
+    .sidebar { width:220px; }
+    .main { margin-left:220px; }
+    .stats-grid { grid-template-columns:repeat(2,1fr); }
+    .content { padding:16px 14px; }
   }
 
   /* ── TOAST ── */
@@ -410,6 +496,20 @@
   .amt-due { color:var(--red); }
   .amt-paid { color:var(--green); }
   .amt-total { color:var(--deep); }
+
+  /* ── LANGUAGE TOGGLE ── */
+  .lang-toggle {
+    display:inline-flex; align-items:center; gap:0;
+    border:1.5px solid var(--border); border-radius:20px; overflow:hidden;
+    font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .lang-btn {
+    padding:5px 12px; border:none; background:transparent;
+    color:var(--muted); cursor:pointer; font-family:'DM Sans',sans-serif;
+    font-size:12px; font-weight:700; transition:all 0.2s;
+  }
+  .lang-btn.active { background:var(--gold); color:var(--deep); }
+  .lang-btn:hover:not(.active) { background:var(--gold-pale); color:var(--brown); }
 
   /* ── WHATSAPP ── */
   .btn-wa {
@@ -545,19 +645,31 @@
     </div>
     <button class="btn-login" onclick="doLogin()">Sign In →</button>
     <p class="login-error" id="login-error">Invalid credentials. Please try again.</p>
-    <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:18px;">🌐 Vasant Lawns · Accessible from any device</p>
+    <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:18px;"><span data-t="accessible">🌐 Vasant Lawns · Accessible from any device</span></p>
   </div>
 </div>
 
 <!-- ════════════════ MAIN APP ════════════════ -->
 <div id="app">
-  <aside class="sidebar">
+  <!-- Sidebar overlay for mobile -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- Bottom nav more-menu -->
+  <div class="bnav-more-menu" id="bnav-more-menu">
+    <button class="bnav-more-item" onclick="showSection('payments');closeMore()"><span>💰</span> <span data-t="payments"></span></button>
+    <button class="bnav-more-item owner-only" onclick="showSection('reports');closeMore()"><span>📈</span> <span data-t="reports"></span></button>
+    <button class="bnav-more-item" onclick="showSection('whatsapp');closeMore()"><span>💬</span> <span data-t="whatsapp_nav"></span></button>
+    <button class="bnav-more-item" onclick="showSection('account');closeMore()"><span>🔐</span> <span data-t="change_password"></span></button>
+    <button class="bnav-more-item" onclick="doLogout()"><span>⬅</span> <span data-t="logout"></span></button>
+  </div>
+
+  <aside class="sidebar" id="main-sidebar">
     <div class="sidebar-header">
       <div class="sidebar-logo">
         <div class="s-emblem">🌿</div>
         <div>
           <h2>Vasant Lawns</h2>
-          <span>Management Portal</span>
+          <span><span data-t="management_portal">Management Portal</span></span>
         </div>
       </div>
     </div>
@@ -568,44 +680,53 @@
     <nav>
       <div class="nav-section">Main</div>
       <div class="nav-item active" onclick="showSection('dashboard')">
-        <span class="icon">📊</span> Dashboard
+        <span class="icon">📊</span> <span data-t="dashboard">Dashboard</span>
       </div>
       <div class="nav-item" onclick="showSection('bookings')">
-        <span class="icon">📋</span> All Bookings
+        <span class="icon">📋</span> <span data-t="all_bookings">All Bookings</span>
       </div>
       <div class="nav-item" onclick="showSection('new-booking')">
-        <span class="icon">➕</span> New Booking
+        <span class="icon">➕</span> <span data-t="new_booking">New Booking</span>
       </div>
       <div class="nav-section">Finance</div>
       <div class="nav-item" onclick="showSection('payments')">
-        <span class="icon">💰</span> Payments
+        <span class="icon">💰</span> <span data-t="payments">Payments</span>
       </div>
       <div class="nav-section">Calendar</div>
       <div class="nav-item" onclick="showSection('calendar')">
-        <span class="icon">📅</span> Availability
+        <span class="icon">📅</span> <span data-t="calendar_nav">Availability</span>
       </div>
       <div class="nav-item owner-only" onclick="showSection('reports')">
-        <span class="icon">📈</span> Reports
+        <span class="icon">📈</span> <span data-t="reports">Reports</span>
       </div>
       <div class="nav-section">Messaging</div>
       <div class="nav-item" onclick="showSection('whatsapp')">
-        <span class="icon">💬</span> WhatsApp
+        <span class="icon">💬</span> <span data-t="whatsapp_nav">WhatsApp</span>
       </div>
       <div class="nav-section">Account</div>
       <div class="nav-item" onclick="showSection('account')">
-        <span class="icon">🔐</span> Change Password
+        <span class="icon">🔐</span> <span data-t="change_password">Change Password</span>
       </div>
     </nav>
     <div class="sidebar-footer">
-      <button class="btn-logout" onclick="doLogout()">⬅ Logout</button>
+      <button class="btn-logout" onclick="doLogout()"><span data-t="logout">Logout</span></button>
     </div>
   </aside>
 
   <div class="main">
     <div class="topbar">
-      <h3 id="section-title">Dashboard</h3>
-      <div style="display:flex;align-items:center;gap:16px;">
-        <span style="font-size:11px;background:#e8f5e9;color:#2D5A27;padding:4px 10px;border-radius:20px;font-weight:600;">🌐 Cloud Ready</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()">
+          <span></span><span></span><span></span>
+        </button>
+        <h3 id="section-title">Dashboard</h3>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="lang-toggle">
+          <button class="lang-btn active" id="lang-en" onclick="setLang('en')">EN</button>
+          <button class="lang-btn" id="lang-mr" onclick="setLang('mr')">मर</button>
+        </div>
+        <span class="cloud-badge" style="font-size:11px;background:#e8f5e9;color:#2D5A27;padding:4px 10px;border-radius:20px;font-weight:600;">🌐 Cloud Ready</span>
         <span class="topbar-date" id="topbar-date"></span>
       </div>
     </div>
@@ -976,6 +1097,26 @@
 
     </div><!-- /content -->
   </div><!-- /main -->
+  <!-- Bottom Navigation Bar (mobile) -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-items">
+      <button class="bnav-item active" onclick="showSection('dashboard')">
+        <span class="bicon">📊</span><span data-t="dashboard"></span>
+      </button>
+      <button class="bnav-item" onclick="showSection('bookings')">
+        <span class="bicon">📋</span><span data-t="bookings"></span>
+      </button>
+      <button class="bnav-item" onclick="showSection('new-booking')">
+        <span class="bicon">➕</span><span data-t="new_booking_short"></span>
+      </button>
+      <button class="bnav-item" onclick="showSection('calendar')">
+        <span class="bicon">📅</span><span data-t="calendar_short"></span>
+      </button>
+      <button class="bnav-item" id="bnav-more-btn" onclick="toggleMore()">
+        <span class="bicon">☰</span><span data-t="more"></span>
+      </button>
+    </div>
+  </nav>
 </div><!-- /app -->
 
 <!-- ── BOOKING DETAIL MODAL ── -->
@@ -1154,20 +1295,319 @@ function initApp(){
   document.getElementById('topbar-date').textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   // Subscribe to real-time updates
   document.body.classList.add('app-active');
+  // Set language buttons
+  document.getElementById('lang-en').classList.toggle('active', currentLang==='en');
+  document.getElementById('lang-mr').classList.toggle('active', currentLang==='mr');
   subscribeBookings();
   showSection('dashboard');
+  setTimeout(applyLang, 50);
 }
 
 // ══════════════════════════════════════════
 //  NAVIGATION
 // ══════════════════════════════════════════
-const SECTION_TITLES = {
-  dashboard:'Dashboard', bookings:'All Bookings',
-  'new-booking':'New Booking', payments:'Payments',
-  calendar:'Availability Calendar', reports:'Reports',
-  whatsapp:'WhatsApp Messaging',
-  account:'Account Settings'
+// ══════════════════════════════════════════
+//  LANGUAGE SYSTEM
+// ══════════════════════════════════════════
+let currentLang = localStorage.getItem('vl_lang') || 'en';
+
+const LANG = {
+  en: {
+    // Nav
+    dashboard: 'Dashboard', bookings: 'Bookings', new_booking: 'New Booking',
+    new_booking_short: 'New', payments: 'Payments', calendar_short: 'Calendar',
+    calendar_nav: 'Availability', reports: 'Reports', whatsapp_nav: 'WhatsApp',
+    change_password: 'Change Password', logout: 'Logout', more: 'More',
+    // Topbar
+    cloud_ready: '🌐 Cloud Ready',
+    // Dashboard
+    total_bookings: 'Total Bookings', confirmed: 'Confirmed',
+    amount_collected: 'Amount Collected', amount_due: 'Amount Due',
+    recent_bookings: 'Recent Bookings', upcoming_events: 'Upcoming Events',
+    no_bookings_yet: 'No bookings yet', no_upcoming: 'No upcoming events',
+    // Bookings table
+    all_bookings: 'All Bookings', search_placeholder: '🔍  Search by name, phone, event...',
+    all_status: 'All Status', client_name: 'Client Name', phone: 'Phone',
+    booking_date: 'Booking Date', event_date: 'Event Date', event_type: 'Event Type',
+    total: 'Total (₹)', paid: 'Paid (₹)', due: 'Due (₹)', status: 'Status', actions: 'Actions',
+    no_bookings_found: 'No bookings found',
+    // New booking form
+    new_booking_title: 'New Booking', edit_booking_title: 'Edit Booking',
+    full_name: 'Client Name *', phone_label: 'Phone Number *', email: 'Email',
+    event_type_label: 'Event Type *', booking_date_label: 'Booking Date *',
+    event_date_label: 'Event Date *', slot: 'Slot', expected_guests: 'Expected Guests',
+    status_label: 'Status', total_amount: 'Total Amount (₹) *',
+    amount_paid: 'Amount Paid (₹)', amount_due_label: 'Amount Due (₹)',
+    notes: 'Notes / Special Requirements', save_booking: '💾 Save Booking', clear: '✕ Clear',
+    select_event: 'Select event',
+    morning: 'Morning (6am–2pm)', evening: 'Evening (4pm–11pm)', full_day: 'Full Day',
+    wedding: 'Wedding', reception: 'Reception', engagement: 'Engagement',
+    birthday: 'Birthday Party', corporate: 'Corporate Event', haldi: 'Haldi / Mehendi',
+    naming: 'Naming Ceremony', anniversary: 'Anniversary', other: 'Other',
+    // Payments
+    total_collected: 'Total Collected', total_outstanding: 'Total Outstanding',
+    total_booking_value: 'Total Booking Value', payment_ledger: 'Payment Ledger',
+    record_payment: '➕ Record Payment', cleared: '✅ Cleared',
+    select_booking: '-- Select Booking --', amount_to_add: 'Amount to Add (₹)',
+    payment_mode: 'Payment Mode', note: 'Note', confirm_payment: '✅ Confirm Payment',
+    cash: 'Cash', bank_transfer: 'Bank Transfer', upi: 'UPI', cheque: 'Cheque',
+    // Calendar
+    availability_calendar: 'Booking Calendar', select_date: 'Select a date',
+    available: '✅ Available – No bookings', view_details: 'View Details',
+    // Reports
+    total_revenue: 'Total Revenue', this_month: 'This Month',
+    event_breakdown: 'Event Type Breakdown', monthly_summary: 'Monthly Summary',
+    // WhatsApp
+    send_whatsapp: '💬 Send WhatsApp Message', select_booking_wa: '-- Select a booking --',
+    message_template: 'Message Template', message_label: 'Message',
+    open_whatsapp: 'Open in WhatsApp', message_log: '📜 Message Log',
+    message_templates: '📋 Message Templates', no_messages: 'No messages sent yet',
+    choose_template: '-- Choose template --',
+    tpl_confirm: '✅ Booking Confirmation', tpl_reminder: '⏰ Payment Reminder',
+    tpl_event: '📅 Event Day Reminder', tpl_payment_rcvd: '💚 Payment Received',
+    tpl_cancelled: '❌ Booking Cancelled', tpl_custom: '✍️ Custom Message',
+    // Account
+    account_settings: 'Account Settings', change_password_title: '🔐 Change Password',
+    logged_in_as: 'Logged in as:', current_password: 'Current Password',
+    new_password: 'New Password', confirm_password: 'Confirm New Password',
+    update_password: '🔒 Update Password',
+    // Status tags
+    s_confirmed: 'Confirmed', s_pending: 'Pending', s_completed: 'Completed', s_cancelled: 'Cancelled',
+    // Detail modal
+    booking_details: 'Booking Details', booking_id: 'Booking ID',
+    client_name_d: 'Client Name', slot_d: 'Slot', guests_d: 'Expected Guests',
+    total_amount_d: 'Total Amount', amount_paid_d: 'Amount Paid', amount_due_d: 'Amount Due',
+    notes_d: 'Notes', close: 'Close', edit: '✏️ Edit',
+    // Toast / alerts
+    fill_required: 'Please fill all required fields (*)',
+    booking_saved: 'Booking saved! ID: ', booking_updated: 'Booking updated!',
+    booking_deleted: 'Booking deleted.', payment_recorded: 'Payment recorded: ',
+    pass_incorrect: 'Current password is incorrect.',
+    pass_short: 'New password must be at least 6 characters.',
+    pass_mismatch: 'Passwords do not match.',
+    pass_updated: '✅ Password updated successfully!',
+    select_booking_err: 'Please select a booking', enter_amount: 'Enter a valid amount',
+    wa_opened: '💬 WhatsApp opened for ',
+    // Misc
+    owner: 'Owner', employee: 'Employee',
+    management_portal: 'Management Portal',
+    accessible: '<span data-t="accessible">🌐 Vasant Lawns · Accessible from any device</span>',
+    delete_confirm: 'Delete booking ', delete_confirm2: '? This cannot be undone.',
+  },
+  mr: {
+    // Nav
+    dashboard: 'डॅशबोर्ड', bookings: 'बुकिंग्स', new_booking: 'नवीन बुकिंग',
+    new_booking_short: 'नवीन', payments: 'पेमेंट', calendar_short: 'कॅलेंडर',
+    calendar_nav: 'उपलब्धता', reports: 'अहवाल', whatsapp_nav: 'व्हॉटसॅप',
+    change_password: 'पासवर्ड बदला', logout: 'बाहेर पडा', more: 'अधिक',
+    // Topbar
+    cloud_ready: '🌐 क्लाउड तयार',
+    // Dashboard
+    total_bookings: 'एकूण बुकिंग्स', confirmed: 'पुष्टी झालेल्या',
+    amount_collected: 'जमा रक्कम', amount_due: 'देय रक्कम',
+    recent_bookings: 'अलीकडील बुकिंग्स', upcoming_events: 'आगामी कार्यक्रम',
+    no_bookings_yet: 'अद्याप बुकिंग नाही', no_upcoming: 'कोणतेही आगामी कार्यक्रम नाही',
+    // Bookings table
+    all_bookings: 'सर्व बुकिंग्स', search_placeholder: '🔍  नाव, फोन, कार्यक्रम शोधा...',
+    all_status: 'सर्व स्थिती', client_name: 'ग्राहकाचे नाव', phone: 'फोन',
+    booking_date: 'बुकिंग तारीख', event_date: 'कार्यक्रम तारीख', event_type: 'कार्यक्रम प्रकार',
+    total: 'एकूण (₹)', paid: 'भरलेले (₹)', due: 'देय (₹)', status: 'स्थिती', actions: 'कृती',
+    no_bookings_found: 'कोणतीही बुकिंग सापडली नाही',
+    // New booking form
+    new_booking_title: 'नवीन बुकिंग', edit_booking_title: 'बुकिंग संपादित करा',
+    full_name: 'ग्राहकाचे नाव *', phone_label: 'फोन नंबर *', email: 'ईमेल',
+    event_type_label: 'कार्यक्रम प्रकार *', booking_date_label: 'बुकिंग तारीख *',
+    event_date_label: 'कार्यक्रम तारीख *', slot: 'वेळ', expected_guests: 'अपेक्षित पाहुणे',
+    status_label: 'स्थिती', total_amount: 'एकूण रक्कम (₹) *',
+    amount_paid: 'भरलेली रक्कम (₹)', amount_due_label: 'देय रक्कम (₹)',
+    notes: 'नोट्स / विशेष आवश्यकता', save_booking: '💾 बुकिंग जतन करा', clear: '✕ साफ करा',
+    select_event: 'कार्यक्रम निवडा',
+    morning: 'सकाळ (सकाळी ६–दुपारी २)', evening: 'संध्याकाळ (सायं ४–रात्री ११)', full_day: 'संपूर्ण दिवस',
+    wedding: 'विवाह सोहळा', reception: 'रिसेप्शन', engagement: 'साखरपुडा',
+    birthday: 'वाढदिवस पार्टी', corporate: 'कॉर्पोरेट कार्यक्रम', haldi: 'हळदी / मेहंदी',
+    naming: 'बारसे', anniversary: 'वर्धापन दिन', other: 'इतर',
+    // Payments
+    total_collected: 'एकूण जमा', total_outstanding: 'एकूण देय', total_booking_value: 'एकूण बुकिंग मूल्य',
+    payment_ledger: 'पेमेंट खातेवही', record_payment: '➕ पेमेंट नोंदवा', cleared: '✅ पूर्ण भरलेले',
+    select_booking: '-- बुकिंग निवडा --', amount_to_add: 'रक्कम जोडा (₹)',
+    payment_mode: 'पेमेंट पद्धत', note: 'नोट', confirm_payment: '✅ पेमेंट पुष्टी करा',
+    cash: 'रोख', bank_transfer: 'बँक ट्रान्सफर', upi: 'UPI', cheque: 'धनादेश',
+    // Calendar
+    availability_calendar: 'बुकिंग कॅलेंडर', select_date: 'तारीख निवडा',
+    available: '✅ उपलब्ध – कोणतीही बुकिंग नाही', view_details: 'तपशील पहा',
+    // Reports
+    total_revenue: 'एकूण महसूल', this_month: 'या महिन्यात',
+    event_breakdown: 'कार्यक्रम प्रकारनिहाय', monthly_summary: 'मासिक सारांश',
+    // WhatsApp
+    send_whatsapp: '💬 व्हॉटसॅप संदेश पाठवा', select_booking_wa: '-- बुकिंग निवडा --',
+    message_template: 'संदेश टेम्पलेट', message_label: 'संदेश',
+    open_whatsapp: 'व्हॉटसॅपवर उघडा', message_log: '📜 संदेश लॉग',
+    message_templates: '📋 संदेश टेम्पलेट', no_messages: 'अद्याप कोणताही संदेश पाठवला नाही',
+    choose_template: '-- टेम्पलेट निवडा --',
+    tpl_confirm: '✅ बुकिंग पुष्टी', tpl_reminder: '⏰ पेमेंट स्मरणपत्र',
+    tpl_event: '📅 कार्यक्रम दिवस स्मरण', tpl_payment_rcvd: '💚 पेमेंट मिळाले',
+    tpl_cancelled: '❌ बुकिंग रद्द', tpl_custom: '✍️ सानुकूल संदेश',
+    // Account
+    account_settings: 'खाते सेटिंग्ज', change_password_title: '🔐 पासवर्ड बदला',
+    logged_in_as: 'लॉग इन केलेले:', current_password: 'सध्याचा पासवर्ड',
+    new_password: 'नवीन पासवर्ड', confirm_password: 'नवीन पासवर्ड पुन्हा टाका',
+    update_password: '🔒 पासवर्ड अपडेट करा',
+    // Status tags
+    s_confirmed: 'पुष्टी झाली', s_pending: 'प्रलंबित', s_completed: 'पूर्ण झाले', s_cancelled: 'रद्द',
+    // Detail modal
+    booking_details: 'बुकिंग तपशील', booking_id: 'बुकिंग आयडी',
+    client_name_d: 'ग्राहकाचे नाव', slot_d: 'वेळ', guests_d: 'अपेक्षित पाहुणे',
+    total_amount_d: 'एकूण रक्कम', amount_paid_d: 'भरलेली रक्कम', amount_due_d: 'देय रक्कम',
+    notes_d: 'नोट्स', close: 'बंद करा', edit: '✏️ संपादित करा',
+    // Toast / alerts
+    fill_required: 'कृपया सर्व आवश्यक माहिती भरा (*)',
+    booking_saved: 'बुकिंग जतन झाली! आयडी: ', booking_updated: 'बुकिंग अपडेट झाली!',
+    booking_deleted: 'बुकिंग हटवली.', payment_recorded: 'पेमेंट नोंदवले: ',
+    pass_incorrect: 'सध्याचा पासवर्ड चुकीचा आहे.',
+    pass_short: 'नवीन पासवर्ड किमान ६ अक्षरांचा असावा.',
+    pass_mismatch: 'पासवर्ड जुळत नाही.',
+    pass_updated: '✅ पासवर्ड यशस्वीरित्या अपडेट झाला!',
+    select_booking_err: 'कृपया बुकिंग निवडा', enter_amount: 'वैध रक्कम प्रविष्ट करा',
+    wa_opened: '💬 व्हॉटसॅप उघडले: ',
+    // Misc
+    owner: 'मालक', employee: 'कर्मचारी',
+    management_portal: 'व्यवस्थापन पोर्टल',
+    accessible: '🌐 वसंत लॉन्स · कोणत्याही डिव्हाइसवरून प्रवेश करा',
+    delete_confirm: 'बुकिंग ', delete_confirm2: ' हटवायची? हे पूर्ववत करता येणार नाही.',
+  }
 };
+
+function t(key){ return (LANG[currentLang] || LANG.en)[key] || LANG.en[key] || key; }
+
+function setLang(lang){
+  currentLang = lang;
+  localStorage.setItem('vl_lang', lang);
+  document.getElementById('lang-en').classList.toggle('active', lang==='en');
+  document.getElementById('lang-mr').classList.toggle('active', lang==='mr');
+  applyLang();
+  // Re-render current section
+  const active = document.querySelector('.section.active');
+  if(active){
+    const id = active.id.replace('section-','');
+    if(id==='dashboard') renderDashboard();
+    if(id==='bookings') renderBookingsTable();
+    if(id==='payments') renderPayments();
+    if(id==='calendar') renderCalendar();
+    if(id==='reports') renderReports();
+    if(id==='whatsapp') initWhatsApp();
+    if(id==='account') initAccount();
+    if(id==='new-booking') applyFormLang();
+  }
+}
+
+function applyLang(){
+  // Update all data-t elements
+  document.querySelectorAll('[data-t]').forEach(el=>{
+    el.textContent = t(el.getAttribute('data-t'));
+  });
+  // Update topbar date
+  const dateEl = document.getElementById('topbar-date');
+  if(dateEl) dateEl.textContent = new Date().toLocaleDateString(currentLang==='mr'?'mr-IN':'en-IN',{weekday:'short',month:'short',day:'numeric'});
+  // Update section title
+  const active = document.querySelector('.section.active');
+  if(active){
+    const id = active.id.replace('section-','');
+    document.getElementById('section-title').textContent = getSectionTitle(id);
+  }
+  // Update bottom nav active
+  updateBottomNav();
+  // Update sidebar
+  document.getElementById('user-name-display').textContent = currentUser ? currentUser.name : '';
+  const badge = document.getElementById('role-badge');
+  if(badge && currentUser) badge.textContent = currentUser.role==='owner' ? t('owner') : t('employee');
+  // Sidebar footer
+  const mgmt = document.querySelector('.sidebar-logo span');
+  if(mgmt) mgmt.textContent = t('management_portal');
+}
+
+function applyFormLang(){
+  const setLabel = (id, key) => {
+    const el = document.querySelector(`label[for="${id}"], #${id}`);
+    // find preceding label
+  };
+  // Update form field labels via data-t
+  document.querySelectorAll('[data-t]').forEach(el=>{
+    el.textContent = t(el.getAttribute('data-t'));
+  });
+  // Update select options
+  const evt = document.getElementById('f-event');
+  if(evt){
+    const cur = evt.value;
+    evt.innerHTML = `<option value="">${t('select_event')}</option>
+      <option value="Wedding">${t('wedding')}</option>
+      <option value="Reception">${t('reception')}</option>
+      <option value="Engagement">${t('engagement')}</option>
+      <option value="Birthday Party">${t('birthday')}</option>
+      <option value="Corporate Event">${t('corporate')}</option>
+      <option value="Haldi / Mehendi">${t('haldi')}</option>
+      <option value="Naming Ceremony">${t('naming')}</option>
+      <option value="Anniversary">${t('anniversary')}</option>
+      <option value="Other">${t('other')}</option>`;
+    if(cur) evt.value = cur;
+  }
+  const slot = document.getElementById('f-slot');
+  if(slot){
+    const cur = slot.value;
+    slot.innerHTML = `<option>${t('morning')}</option><option>${t('evening')}</option><option>${t('full_day')}</option>`;
+  }
+  const pmMode = document.getElementById('pay-mode');
+  if(pmMode) pmMode.innerHTML = `<option>${t('cash')}</option><option>${t('bank_transfer')}</option><option>${t('upi')}</option><option>${t('cheque')}</option>`;
+  const filterSt = document.getElementById('filter-status');
+  if(filterSt){
+    const cur = filterSt.value;
+    filterSt.innerHTML = `<option value="">${t('all_status')}</option><option>${t('s_confirmed')}</option><option>Pending</option><option>Completed</option><option>Cancelled</option>`;
+  }
+}
+
+function getSectionTitle(id){
+  const map = {
+    dashboard: t('dashboard'), bookings: t('all_bookings'),
+    'new-booking': t('new_booking'), payments: t('payments'),
+    calendar: t('availability_calendar'), reports: t('reports'),
+    whatsapp: t('send_whatsapp'), account: t('account_settings')
+  };
+  return map[id] || id;
+}
+
+// ── MOBILE NAV ──
+function toggleSidebar(){
+  const sidebar = document.getElementById('main-sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const btn = document.getElementById('hamburger-btn');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('show');
+  btn.classList.toggle('open');
+}
+function closeSidebar(){
+  document.getElementById('main-sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+  document.getElementById('hamburger-btn').classList.remove('open');
+}
+function toggleMore(){
+  const menu = document.getElementById('bnav-more-menu');
+  menu.classList.toggle('show');
+}
+function closeMore(){
+  document.getElementById('bnav-more-menu').classList.remove('show');
+}
+function updateBottomNav(){
+  const active = document.querySelector('.section.active');
+  if(!active) return;
+  const id = active.id.replace('section-','');
+  document.querySelectorAll('.bnav-item').forEach(b=>b.classList.remove('active'));
+  const map = {dashboard:0, bookings:1, 'new-booking':2, calendar:3};
+  const idx = map[id];
+  const items = document.querySelectorAll('.bnav-item');
+  if(idx !== undefined) items[idx]?.classList.add('active');
+  else items[4]?.classList.add('active'); // more
+}
+
+const SECTION_TITLES = {};  // dynamic via getSectionTitle()
 function showSection(id){
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -1175,7 +1615,10 @@ function showSection(id){
   document.querySelectorAll('.nav-item').forEach(n=>{
     if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+id+"'")) n.classList.add('active');
   });
-  document.getElementById('section-title').textContent = SECTION_TITLES[id]||id;
+  document.getElementById('section-title').textContent = getSectionTitle(id);
+  updateBottomNav();
+  closeSidebar();
+  closeMore();
   if(id==='dashboard') renderDashboard();
   if(id==='bookings') renderBookingsTable();
   if(id==='payments') renderPayments();
@@ -1215,7 +1658,7 @@ async function saveBooking(){
   const paid = parseFloat(document.getElementById('f-paid').value)||0;
 
   if(!name||!phone||!event||!bookingDate||!eventDate||!total){
-    showToast('Please fill all required fields (*)', 'error'); return;
+    showToast(t('fill_required'), 'error'); return;
   }
 
   const due = Math.max(0, total-paid);
@@ -1235,14 +1678,14 @@ async function saveBooking(){
   if(editId){
     bookingObj.id = editId;
     await saveData(bookingObj);
-    showToast('Booking updated!', 'success');
+    showToast(t('booking_updated'), 'success');
   } else {
     await getCounter();
     const id = 'VL-'+bookingIdCounter++;
     bookingObj.id = id;
     await saveData(bookingObj);
     await saveCounter();
-    showToast('Booking saved! ID: '+id, 'success');
+    showToast(t('booking_saved')+id, 'success');
   }
   clearBookingForm();
   showSection('bookings');
@@ -1270,9 +1713,9 @@ function editBooking(id){
 }
 
 async function deleteBooking(id){
-  if(!confirm('Delete booking '+id+'? This cannot be undone.')) return;
+  if(!confirm(t('delete_confirm')+id+t('delete_confirm2'))) return;
   await deleteFromDB(id);
-  showToast('Booking deleted.', 'error');
+  showToast(t('booking_deleted'), 'error');
 }
 
 // ══════════════════════════════════════════
@@ -1282,7 +1725,8 @@ function fmtAmt(n){ return '₹'+Number(n||0).toLocaleString('en-IN'); }
 function fmtDate(d){ if(!d) return '—'; const dt=new Date(d); return dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
 function statusTag(s){
   const map={Confirmed:'confirmed',Pending:'pending',Cancelled:'cancelled',Completed:'completed'};
-  return `<span class="tag tag-${map[s]||'pending'}">${s}</span>`;
+  const labelMap={Confirmed:t('s_confirmed'),Pending:t('s_pending'),Cancelled:t('s_cancelled'),Completed:t('s_completed')};
+  return `<span class="tag tag-${map[s]||'pending'}">${labelMap[s]||s}</span>`;
 }
 
 function renderBookingsTable(){
@@ -1427,8 +1871,8 @@ function fillPayInfo(){
 async function recordPayment(){
   const id=document.getElementById('pay-booking-select').value;
   const amt=parseFloat(document.getElementById('pay-amount').value)||0;
-  if(!id){ showToast('Please select a booking', 'error'); return; }
-  if(amt<=0){ showToast('Enter a valid amount', 'error'); return; }
+  if(!id){ showToast(t('select_booking_err'), 'error'); return; }
+  if(amt<=0){ showToast(t('enter_amount'), 'error'); return; }
   const b = bookings.find(x=>x.id===id);
   if(!b) return;
   const updated = {...b};
@@ -1437,7 +1881,7 @@ async function recordPayment(){
   if(updated.due===0 && updated.status==='Confirmed') updated.status='Completed';
   await saveData(updated);
   closeModal('pay-modal');
-  showToast('Payment recorded: '+fmtAmt(amt), 'success');
+  showToast(t('payment_recorded')+fmtAmt(amt), 'success');
 }
 
 // ══════════════════════════════════════════
@@ -1563,9 +2007,9 @@ function changePassword(){
   const confirm  = document.getElementById('acc-confirm-pass').value;
 
   const actual = getUserPassword(currentUser.username);
-  if(current !== actual){ showToast('Current password is incorrect.', 'error'); return; }
-  if(newPass.length < 6){ showToast('New password must be at least 6 characters.', 'error'); return; }
-  if(newPass !== confirm){ showToast('Passwords do not match.', 'error'); return; }
+  if(current !== actual){ showToast(t('pass_incorrect'), 'error'); return; }
+  if(newPass.length < 6){ showToast(t('pass_short'), 'error'); return; }
+  if(newPass !== confirm){ showToast(t('pass_mismatch'), 'error'); return; }
 
   localStorage.setItem(getUserPassKey(currentUser.username), newPass);
   // Also persist to Firestore
@@ -1575,7 +2019,7 @@ function changePassword(){
   document.getElementById('acc-current-pass').value = '';
   document.getElementById('acc-new-pass').value = '';
   document.getElementById('acc-confirm-pass').value = '';
-  showToast('✅ Password updated successfully!', 'success');
+  showToast(t('pass_updated'), 'success');
 }
 
 // ══════════════════════════════════════════
@@ -1738,7 +2182,7 @@ function sendWaMessage(){
   if(waLog.length > 50) waLog = waLog.slice(0, 50);
   localStorage.setItem('vl_wa_log', JSON.stringify(waLog));
   renderWaLog();
-  showToast('💬 WhatsApp opened for ' + name, 'success');
+  showToast(t('wa_opened') + name, 'success');
 }
 
 function renderWaLog(){
