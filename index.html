@@ -1254,33 +1254,45 @@ async function doLogin(){
   const err = document.getElementById('login-error');
   err.style.display = 'none';
 
-  if(!usernameInput || !password){ err.style.display='block'; return; }
-
-  if(!window._firebaseReady){
-    err.textContent = 'Database not connected. Please check your Firebase config.';
+  if(!usernameInput || !password){
+    err.textContent = 'Please enter username and password.';
     err.style.display='block'; return;
   }
 
-  // Resolve username → email stored in Firestore users_map/{username}
+  if(!window._firebaseReady){
+    err.textContent = 'Database not connected.';
+    err.style.display='block'; return;
+  }
+
+  // Step 1: Look up email from users_map using username
   let email = '';
   try {
     const mapSnap = await window._firebase.getDoc(fbDoc('users_map', usernameInput));
     if(mapSnap.exists()){
       email = mapSnap.data().email;
     } else {
-      err.textContent = 'Invalid credentials. Please try again.';
+      err.textContent = 'Username not found. Check spelling and try again.';
       err.style.display='block'; return;
     }
   } catch(e){
-    err.textContent = 'Invalid credentials. Please try again.';
+    err.textContent = 'DB error: ' + e.message;
     err.style.display='block'; return;
   }
 
+  // Step 2: Sign in with Firebase Auth
   try {
-    const cred = await window._fbAuth.signInWithEmailAndPassword(window._auth, email, password);
+    await window._fbAuth.signInWithEmailAndPassword(window._auth, email, password);
     // onAuthStateChanged handles the rest
   } catch(e){
-    err.textContent = 'Invalid credentials. Please try again.';
+    if(e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential'){
+      err.textContent = 'Incorrect password. Please try again.';
+    } else if(e.code === 'auth/user-not-found'){
+      err.textContent = 'User not found in Firebase Auth.';
+    } else if(e.code === 'auth/network-request-failed'){
+      err.textContent = 'Network error. Check your internet connection.';
+    } else {
+      err.textContent = 'Error: ' + e.code;
+    }
     err.style.display='block';
   }
 }
