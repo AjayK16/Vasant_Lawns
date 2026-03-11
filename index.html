@@ -593,7 +593,13 @@
     </div>
     <button class="btn-login" onclick="doLogin()"><span data-t="sign_in">Sign In →</span></button>
     <p class="login-error" id="login-error"><span data-t="invalid_creds">Invalid credentials. Please try again.</span></p>
-    <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:18px;"><span data-t="accessible">🌐 Vasant Lawns · Accessible from any device</span></p>
+    <div style="display:flex;justify-content:center;margin-top:18px;">
+      <div class="lang-toggle">
+        <button class="lang-btn active" id="login-lang-en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" id="login-lang-mr" onclick="setLang('mr')">मर</button>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:12px;"><span data-t="accessible">🌐 Vasant Lawns · Accessible from any device</span></p>
   </div>
 </div>
 
@@ -627,7 +633,7 @@
     </div>
     <nav>
       <div class="nav-section"><span data-t="nav_main">Main</span></div>
-      <div class="nav-item active" onclick="showSection('dashboard')">
+      <div class="nav-item active no-employee" onclick="showSection('dashboard')">
         <span class="icon">📊</span> <span data-t="dashboard">Dashboard</span>
       </div>
       <div class="nav-item" onclick="showSection('bookings')">
@@ -1064,7 +1070,7 @@
   <!-- Bottom Navigation Bar (mobile) -->
   <nav class="bottom-nav">
     <div class="bottom-nav-items">
-      <button class="bnav-item active" onclick="showSection('dashboard')">
+      <button class="bnav-item active no-employee" onclick="showSection('dashboard')">
         <span class="bicon">📊</span><span data-t="dashboard"></span>
       </button>
       <button class="bnav-item" onclick="showSection('bookings')">
@@ -1344,7 +1350,12 @@ function initApp(){
   document.body.classList.add('app-active');
   subscribeUsers();
   subscribeBookings();
-  showSection('dashboard');
+  // Employees skip dashboard — redirect to bookings
+  if(isEmployee()){
+    showSection('bookings');
+  } else {
+    showSection('dashboard');
+  }
   rebuildAllSelects();
   setTimeout(applyLang, 80);
 }
@@ -1640,8 +1651,16 @@ function t(key){ return (LANG[currentLang]||LANG.en)[key] || LANG.en[key] || key
 function setLang(lang){
   currentLang = lang;
   localStorage.setItem('vl_lang', lang);
-  document.getElementById('lang-en').classList.toggle('active', lang==='en');
-  document.getElementById('lang-mr').classList.toggle('active', lang==='mr');
+  // Update main app lang buttons
+  const enBtn = document.getElementById('lang-en');
+  const mrBtn = document.getElementById('lang-mr');
+  if(enBtn) enBtn.classList.toggle('active', lang==='en');
+  if(mrBtn) mrBtn.classList.toggle('active', lang==='mr');
+  // Update login page lang buttons
+  const lenBtn = document.getElementById('login-lang-en');
+  const lmrBtn = document.getElementById('login-lang-mr');
+  if(lenBtn) lenBtn.classList.toggle('active', lang==='en');
+  if(lmrBtn) lmrBtn.classList.toggle('active', lang==='mr');
   applyLang();
   // Re-render current active section
   const active = document.querySelector('.section.active');
@@ -2520,21 +2539,31 @@ window.addEventListener('load', ()=>{
   document.getElementById('f-booking-date').value = new Date().toISOString().split('T')[0];
   showLoading(LANG[currentLang||'en'].connecting || 'Connecting to database...');
 
-  // Firebase Auth automatically restores session — no manual session handling needed
+  // Firebase Auth automatically restores session — always fetch fresh role from Firestore
   window._fbAuth.onAuthStateChanged(window._auth, async (firebaseUser) => {
     if(firebaseUser){
       try {
+        // Always fetch fresh from Firestore to get latest role/username
         const snap = await window._firebase.getDoc(fbDoc('users', firebaseUser.uid));
         if(snap.exists()){
           const d = snap.data();
-          currentUser = { uid: firebaseUser.uid, username: d.username, name: d.name, role: d.role, email: firebaseUser.email };
+          // Force fresh role — never use cached version
+          currentUser = {
+            uid:      firebaseUser.uid,
+            username: d.username,
+            name:     d.name,
+            role:     d.role,
+            email:    firebaseUser.email
+          };
           hideLoading();
           document.getElementById('login-page').style.display = 'none';
           document.getElementById('app').classList.add('visible');
           initApp();
           return;
+        } else {
+          console.warn('No Firestore profile found for UID:', firebaseUser.uid);
         }
-      } catch(e){ console.warn('Profile fetch failed:', e); }
+      } catch(e){ console.warn('Profile fetch failed:', e.message); }
     }
     hideLoading();
     document.getElementById('login-page').style.display = 'flex';
